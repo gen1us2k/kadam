@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+import VocabBrowser from '../components/VocabBrowser.astro';
+import { loadVocab } from '../lib/vocab';
+
+const rows = loadVocab();
+---
+
+<Base title="Словарь · Кыргызча 80/20" active="/vocab">
+  <section class="prose">
+    <h1>Частотный словарь</h1>
+    <p>
+      {rows.length} слов и фраз из курса. Поиск по кыргызскому и русскому, фильтр по неделям.
+      Полная колода для Anki — файл <code>anki/kyrgyz-frequency.csv</code> в репозитории.
+    </p>
+  </section>
+
+  <VocabBrowser rows={rows} />
+</Base>

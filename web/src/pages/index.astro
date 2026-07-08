@@ -1,0 +1,51 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../layouts/Base.astro';
+
+const weeks = (await getCollection('weeks')).sort((a, b) => a.id.localeCompare(b.id));
+const cards = weeks.map((entry) => {
+  const slug = entry.id.split('/')[0];
+  const h1 = entry.body?.match(/^#\s+(.+)$/m)?.[1] ?? slug;
+  return {
+    slug,
+    num: slug.replace('week-', ''),
+    title: h1.replace(/^Неделя\s+\d+\s*[—–-]\s*/, ''),
+  };
+});
+---
+
+<Base title="Кыргызча 80/20 — план изучения" active="/">
+  <section class="hero">
+    <h1>Кыргызский за 10–12 недель</h1>
+    <p>
+      План 80/20 для русскоговорящего с нуля: учим только то, что даёт максимум понимания и речи
+      на единицу времени. Цель — уверенный A2 за три месяца при ~1.5 ч/день.
+    </p>
+  </section>
+
+  <div class="quicklinks">
+    <a class="pill" href="/grammar">Грамматика на одной странице</a>
+    <a class="pill" href="/phrases">Разговорник выживания</a>
+    <a class="pill" href="/vocab">Словарь · ~470 слов</a>
+  </div>
+
+  <h2>План по неделям</h2>
+  <div class="grid">
+    {cards.map((c) => (
+      <a class="card" href={`/weeks/${c.slug}`}>
+        <span class="num">НЕДЕЛЯ {c.num}</span>
+        <span class="title">{c.title}</span>
+      </a>
+    ))}
+  </div>
+
+  <section class="prose">
+    <h2>Ежедневная рутина (~1–1.5 часа)</h2>
+    <ul>
+      <li>20 мин Anki — новые слова и повторение, не пропускать.</li>
+      <li>20–30 мин грамматика и упражнения из недели.</li>
+      <li>20 мин аудирование (Азаттык, музыка).</li>
+      <li>Разговор с носителем с 5-й недели, 2–3 раза в неделю.</li>
+    </ul>
+  </section>
+</Base>

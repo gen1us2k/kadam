@@ -1,0 +1,73 @@
+---
+import type { VocabRow } from '../lib/vocab';
+
+interface Props {
+  rows: VocabRow[];
+}
+
+const { rows } = Astro.props;
+
+const weekTags = [...new Set(rows.flatMap((r) => r.tags).filter((t) => /^week\d+$/.test(t)))].sort();
+const weekLabel = (t: string) => String(Number(t.replace('week', '')));
+---
+
+<div class="vocab">
+  <div class="vocab-controls">
+    <input type="search" id="vocab-search" placeholder="Поиск: кыргызча или русский…" autocomplete="off" />
+    <div class="tag-filters" id="vocab-tags">
+      <button class="tag-btn active" data-tag="">Все</button>
+      {weekTags.map((t) => <button class="tag-btn" data-tag={t}>Нед. {weekLabel(t)}</button>)}
+    </div>
+  </div>
+
+  <p class="vocab-count" id="vocab-count"></p>
+
+  <div class="table-scroll">
+    <table class="data-table">
+      <thead>
+        <tr><th>Кыргызча</th><th>Русский</th><th>Темы</th></tr>
+      </thead>
+      <tbody id="vocab-body">
+        {rows.map((r) => (
+          <tr data-kg={r.kg.toLowerCase()} data-ru={r.ru.toLowerCase()} data-tags={r.tags.join(' ')}>
+            <td>{r.kg}</td>
+            <td>{r.ru}</td>
+            <td>{r.tags.join(', ')}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const search = document.getElementById('vocab-search') as HTMLInputElement | null;
+  const tagWrap = document.getElementById('vocab-tags');
+  const count = document.getElementById('vocab-count');
+  const rows = Array.from(document.querySelectorAll<HTMLTableRowElement>('#vocab-body tr'));
+  let activeTag = '';
+
+  function apply() {
+    const q = (search?.value ?? '').trim().toLowerCase();
+    let shown = 0;
+    for (const row of rows) {
+      const matchText = !q || (row.dataset.kg ?? '').includes(q) || (row.dataset.ru ?? '').includes(q);
+      const matchTag = !activeTag || (row.dataset.tags ?? '').split(' ').includes(activeTag);
+      const show = matchText && matchTag;
+      row.hidden = !show;
+      if (show) shown++;
+    }
+    if (count) count.textContent = `Показано: ${shown} из ${rows.length}`;
+  }
+
+  search?.addEventListener('input', apply);
+  tagWrap?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.tag-btn');
+    if (!btn) return;
+    activeTag = btn.dataset.tag ?? '';
+    tagWrap.querySelectorAll('.tag-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    apply();
+  });
+
+  apply();
+</script>

@@ -1,0 +1,47 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** Path of the current page for nav highlighting, e.g. "/grammar". */
+  active?: string;
+}
+
+const { title, description = 'Кыргызский язык за 10–12 недель по принципу 80/20.', active = '' } = Astro.props;
+
+const links = [
+  { href: '/', label: 'Главная' },
+  { href: '/grammar', label: 'Грамматика' },
+  { href: '/phrases', label: 'Разговорник' },
+  { href: '/vocab', label: 'Словарь' },
+];
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <nav class="nav wrap">
+        <a class="brand" href="/">Кыргызча 80/20</a>
+        {links.map((l) => (
+          <a href={l.href} class={active === l.href ? 'active' : ''}>{l.label}</a>
+        ))}
+      </nav>
+    </header>
+    <main class="wrap">
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        Материалы — markdown в корне репозитория. Учись каждый день · Anki + носитель.
+      </div>
+    </footer>
+  </body>
+</html>
