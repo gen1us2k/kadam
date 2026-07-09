@@ -7,7 +7,6 @@
 | Что | Где |
 |---|---|
 | План по неделям (материалы, грамматика, задания) | [weeks/](weeks/) |
-| Шпаргалка по всей грамматике на одной странице | [grammar-cheatsheet.md](grammar-cheatsheet.md) |
 | Разговорник выживания (первые 50 фраз) | [phrases.md](phrases.md) |
 | Частотный словарь для Anki (~450 слов, с тегами по неделям) | [anki/kyrgyz-frequency.csv](anki/kyrgyz-frequency.csv) |
 | Как импортировать колоду в Anki | [anki/README.md](anki/README.md) |
