@@ -1,6 +1,10 @@
 ---
 import { getCollection, render } from 'astro:content';
 import Base from '../../layouts/Base.astro';
+import StudySession from '../../components/StudySession.tsx';
+import Checklist from '../../components/Checklist.tsx';
+import { loadVocab } from '../../lib/vocab';
+import { extractTasks } from '../../lib/tasks';
 
 export async function getStaticPaths() {
   const weeks = (await getCollection('weeks')).sort((a, b) => a.id.localeCompare(b.id));
@@ -14,6 +18,13 @@ const { entry, prev, next } = Astro.props;
 const { Content, headings } = await render(entry);
 const title = headings[0]?.text ?? entry.id;
 
+const slug = entry.id.split('/')[0];
+// Folder slug is "week-01"; CSV tags are "week01" — normalise before querying the deck.
+const weekTag = slug.replace('-', '');
+const deck = loadVocab();
+const weekWordCount = deck.filter((c) => c.tags.includes(weekTag)).length;
+const tasks = extractTasks(entry.body ?? '');
+
 const slugOf = (e) => e.id.split('/')[0];
 const labelOf = (e) => e.body?.match(/^#\s+(.+)$/m)?.[1] ?? slugOf(e);
 ---
@@ -22,6 +33,22 @@ const labelOf = (e) => e.body?.match(/^#\s+(.+)$/m)?.[1] ?? slugOf(e);
   <article class="prose">
     <Content />
   </article>
+
+  <section class="week-tasks">
+    <h2>Задания недели</h2>
+    {weekWordCount > 0 && (
+      <>
+        <p>Слова этой недели с интервальным повторением ({weekWordCount} шт.):</p>
+        <StudySession deck={deck} week={weekTag} client:visible />
+      </>
+    )}
+    {tasks.length > 0 && (
+      <>
+        <h3>Отметьте выполненное</h3>
+        <Checklist items={tasks} storageKey={slug} client:visible />
+      </>
+    )}
+  </section>
 
   <nav class="pager">
     {prev ? <a href={`/weeks/${slugOf(prev)}`}>← {labelOf(prev)}</a> : <span class="spacer"></span>}

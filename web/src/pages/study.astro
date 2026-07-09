@@ -1,0 +1,19 @@
+---
+import Base from '../layouts/Base.astro';
+import StudySession from '../components/StudySession.tsx';
+import { loadVocab } from '../lib/vocab';
+
+const deck = loadVocab();
+---
+
+<Base title="Повторение · Кыргызча 80/20" active="/study">
+  <section class="prose">
+    <h1>Повторение на сегодня</h1>
+    <p>
+      Интервальное повторение по системе Лейтнера: выбирайте перевод. Ответили верно — слово
+      вернётся позже; ошиблись — скоро снова. Прогресс хранится в браузере.
+    </p>
+  </section>
+
+  <StudySession deck={deck} client:load />
+</Base>

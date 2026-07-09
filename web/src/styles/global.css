@@ -169,7 +169,107 @@ main { padding: 2rem 0 4rem; }
 .vocab-count { color: var(--muted); font-size: 0.85rem; margin: 0.5rem 0; }
 tr[hidden] { display: none; }
 
+/* Buttons */
+.btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 0.55rem 1.2rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.05); }
+.btn.ghost { background: transparent; color: var(--accent); }
+
+/* Study session (SRS) */
+.study { max-width: 620px; }
+.study-progress { color: var(--muted); font-size: 0.85rem; margin-bottom: 0.6rem; }
+.study-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.5rem;
+}
+.prompt-label { color: var(--muted); font-size: 0.85rem; }
+.prompt-kg { font-size: 2rem; font-weight: 700; margin: 0.3rem 0 1.2rem; }
+.choices { display: grid; gap: 0.6rem; }
+.choice {
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 0.7rem 0.9rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.choice:hover:not(:disabled) { border-color: var(--accent); }
+.choice:disabled { cursor: default; }
+.choice.correct { border-color: #2f8f4e; background: rgba(47, 143, 78, 0.14); }
+.choice.wrong { border-color: #c0392b; background: rgba(192, 57, 43, 0.14); }
+.study-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+.study-meta { color: var(--muted); font-size: 0.9rem; }
+.study-summary {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1.5rem;
+  max-width: 620px;
+}
+.study-summary h2 { margin-top: 0; }
+
+/* Interactive weekly task list */
+.tasks { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0.4rem 1rem; }
+.tasks .task {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.tasks .task:last-child { border-bottom: none; }
+.tasks .task input { margin-top: 0.3rem; width: 1.05rem; height: 1.05rem; accent-color: var(--accent); flex: none; }
+.tasks .task.done span { color: var(--muted); text-decoration: line-through; }
+.task-progress { color: var(--muted); font-size: 0.85rem; margin: 0.4rem 0; }
+
+/* Home due-summary */
+.home-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+  margin: 1.2rem 0;
+}
+
+/* Week study block + home progress badges */
+.week-tasks { margin: 2rem 0; padding: 1.2rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.week-tasks h2 { margin-top: 0; }
+.card .progress { display: block; margin-top: 0.4rem; font-size: 0.8rem; color: var(--muted); }
+.due-badge {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.78rem;
+  margin-left: 0.35rem;
+}
+
 @media (max-width: 640px) {
   body { font-size: 16px; }
   .hero h1 { font-size: 1.7rem; }
+  .prompt-kg { font-size: 1.6rem; }
 }

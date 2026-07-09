@@ -1,7 +1,10 @@
 ---
 import { getCollection } from 'astro:content';
 import Base from '../layouts/Base.astro';
+import HomeStatus from '../components/HomeStatus.tsx';
+import { loadVocab } from '../lib/vocab';
 
+const deck = loadVocab();
 const weeks = (await getCollection('weeks')).sort((a, b) => a.id.localeCompare(b.id));
 const cards = weeks.map((entry) => {
   const slug = entry.id.split('/')[0];
@@ -29,12 +32,15 @@ const cards = weeks.map((entry) => {
     <a class="pill" href="/vocab">Словарь · ~470 слов</a>
   </div>
 
+  <HomeStatus deck={deck} client:load />
+
   <h2>План по неделям</h2>
   <div class="grid">
     {cards.map((c) => (
-      <a class="card" href={`/weeks/${c.slug}`}>
+      <a class="card" href={`/weeks/${c.slug}`} data-week={c.slug.replace('-', '')}>
         <span class="num">НЕДЕЛЯ {c.num}</span>
         <span class="title">{c.title}</span>
+        <span class="progress"></span>
       </a>
     ))}
   </div>
