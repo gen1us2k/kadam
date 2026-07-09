@@ -11,6 +11,8 @@ export interface CardState {
 export interface DeckCard {
   kg: string;
   ru: string;
+  /** Optional Kyrgyz example sentence, shown as a hint after answering. */
+  example?: string;
   tags: string[];
 }
 

@@ -8,7 +8,10 @@ interface Props {
 const { rows } = Astro.props;
 
 const weekTags = [...new Set(rows.flatMap((r) => r.tags).filter((t) => /^week\d+$/.test(t)))].sort();
-const weekLabel = (t: string) => String(Number(t.replace('week', '')));
+const weekLabel = (t: string) => `Нед. ${Number(t.replace('week', ''))}`;
+const LEVELS = ['a1', 'a2', 'b1', 'b2'];
+const levelTags = LEVELS.filter((l) => rows.some((r) => r.tags.includes(l)));
+const hasExamples = rows.some((r) => r.example);
 ---
 
 <div class="vocab">
@@ -16,7 +19,8 @@ const weekLabel = (t: string) => String(Number(t.replace('week', '')));
     <input type="search" id="vocab-search" placeholder="Поиск: кыргызча или русский…" autocomplete="off" />
     <div class="tag-filters" id="vocab-tags">
       <button class="tag-btn active" data-tag="">Все</button>
-      {weekTags.map((t) => <button class="tag-btn" data-tag={t}>Нед. {weekLabel(t)}</button>)}
+      {levelTags.map((t) => <button class="tag-btn" data-tag={t}>{t.toUpperCase()}</button>)}
+      {weekTags.map((t) => <button class="tag-btn" data-tag={t}>{weekLabel(t)}</button>)}
     </div>
   </div>
 
@@ -25,13 +29,14 @@ const weekLabel = (t: string) => String(Number(t.replace('week', '')));
   <div class="table-scroll">
     <table class="data-table">
       <thead>
-        <tr><th>Кыргызча</th><th>Русский</th><th>Темы</th></tr>
+        <tr><th>Кыргызча</th><th>Русский</th>{hasExamples && <th>Пример</th>}<th>Темы</th></tr>
       </thead>
       <tbody id="vocab-body">
         {rows.map((r) => (
           <tr data-kg={r.kg.toLowerCase()} data-ru={r.ru.toLowerCase()} data-tags={r.tags.join(' ')}>
             <td>{r.kg}</td>
             <td>{r.ru}</td>
+            {hasExamples && <td class="ex">{r.example ?? ''}</td>}
             <td>{r.tags.join(', ')}</td>
           </tr>
         ))}

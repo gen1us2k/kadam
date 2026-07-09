@@ -224,6 +224,15 @@ tr[hidden] { display: none; }
   max-width: 620px;
 }
 .study-summary h2 { margin-top: 0; }
+.study-example {
+  margin-top: 1rem;
+  padding: 0.55rem 0.8rem;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+.data-table td.ex { color: var(--muted); }
 
 /* Interactive weekly task list */
 .tasks { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: 0.4rem 1rem; }

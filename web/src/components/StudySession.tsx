@@ -107,6 +107,9 @@ export default function StudySession({ deck, week }: Props) {
             );
           })}
         </div>
+        {choice && card.example && (
+          <div className="study-example">{card.example}</div>
+        )}
       </div>
       <div className="study-footer">
         <div className="study-meta">Счёт: {score.correct} / {score.total}</div>
