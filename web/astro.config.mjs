@@ -14,7 +14,7 @@ export default defineConfig({
 
   vite: {
     // Allow reading the source-of-truth CSV/markdown from the repo root (above web/).
-    server: { fs: { allow: ['..'] } },
+    server: { fs: { allow: ['..'] }, allowedHosts: ['localhost', 'xerox-handclap-baggie.ngrok-free.dev'] },
   },
 
   integrations: [react()],

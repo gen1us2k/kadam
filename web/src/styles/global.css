@@ -254,6 +254,37 @@ tr[hidden] { display: none; }
   margin: 1.2rem 0;
 }
 
+/* Journey map */
+.journey { max-width: 720px; }
+.journey-progress { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.2rem; }
+.journey-progress .bar { flex: 1; height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.journey-progress .bar-fill { height: 100%; background: var(--accent); transition: width 0.2s; }
+.journey-steps { list-style: none; margin: 0; padding: 0; }
+.jstep {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.9rem 1rem;
+  margin: 0 0 0.6rem;
+  border-left: 3px solid var(--border);
+}
+.jstep.grammar { border-left-color: #6b7bd6; }
+.jstep.vocab { border-left-color: #2f8f4e; }
+.jstep.review { border-left-color: var(--accent); }
+.jstep.current { box-shadow: 0 0 0 2px var(--accent-soft); }
+.jstep.done { opacity: 0.6; }
+.jstep.done .jstep-title { text-decoration: line-through; }
+.jstep-head { display: flex; align-items: flex-start; gap: 0.7rem; }
+.jstep-icon { font-size: 1.2rem; line-height: 1.4; flex: none; }
+.jstep-body { flex: 1; }
+.jstep-title { font-weight: 600; }
+.jstep-check { display: flex; align-items: center; gap: 0.35rem; color: var(--muted); font-size: 0.82rem; white-space: nowrap; cursor: pointer; }
+.jstep-check input { accent-color: var(--accent); }
+.jstep-actions { margin-top: 0.6rem; }
+.jstep-actions .btn { padding: 0.35rem 0.9rem; font-size: 0.9rem; }
+.jstep-study { margin-top: 0.9rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+
 /* Week study block + home progress badges */
 .week-tasks { margin: 2rem 0; padding: 1.2rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
 .week-tasks h2 { margin-top: 0; }
