@@ -36,9 +36,11 @@ const ICON: Record<JourneyStep['type'], string> = {
   review: '🔁',
 };
 
+const domId = (s: JourneyStep) => `jstep-${s.id.replace(/:/g, '-')}`;
+
 export default function Journey({ steps, deck }: Props) {
   const [done, setDone] = useState<Progress>({});
-  const [open, setOpen] = useState<string | null>(null);
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -46,12 +48,21 @@ export default function Journey({ steps, deck }: Props) {
     setReady(true);
   }, []);
 
-  function toggle(id: string) {
+  useEffect(() => {
+    if (openIdx == null) return;
+    document.getElementById(domId(steps[openIdx]))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [openIdx, steps]);
+
+  function toggleDone(id: string) {
     setDone((d) => {
       const next = { ...d, [id]: !d[id] };
       save(next);
       return next;
     });
+  }
+
+  function goTo(idx: number) {
+    if (idx >= 0 && idx < steps.length) setOpenIdx(idx);
   }
 
   const doneCount = ready ? steps.filter((s) => done[s.id]).length : 0;
@@ -62,41 +73,45 @@ export default function Journey({ steps, deck }: Props) {
     <div className="journey">
       <div className="journey-progress">
         <div className="bar"><div className="bar-fill" style={{ width: `${percent}%` }} /></div>
-        <span className="study-meta">{doneCount} из {steps.length} шагов</span>
+        <span className="study-meta">{doneCount} из {steps.length}</span>
       </div>
 
       <ol className="journey-steps">
         {steps.map((s, i) => {
           const isDone = ready && !!done[s.id];
+          const isOpen = i === openIdx;
           const isCurrent = i === currentIdx;
-          const isOpen = open === s.id;
           return (
-            <li key={s.id} className={`jstep ${s.type}${isDone ? ' done' : ''}${isCurrent ? ' current' : ''}`}>
-              <div className="jstep-head">
+            <li
+              key={s.id}
+              id={domId(s)}
+              className={`jstep ${s.type}${isDone ? ' done' : ''}${isCurrent ? ' current' : ''}${isOpen ? ' open' : ''}`}
+            >
+              <button className="jstep-head" onClick={() => setOpenIdx(isOpen ? null : i)} aria-expanded={isOpen}>
                 <span className="jstep-icon" aria-hidden="true">{ICON[s.type]}</span>
-                <div className="jstep-body">
-                  <div className="jstep-title">{s.title}</div>
-                  {s.subtitle && <div className="study-meta">{s.subtitle}</div>}
-                </div>
-                <label className="jstep-check">
-                  <input type="checkbox" checked={isDone} onChange={() => toggle(s.id)} /> готово
-                </label>
-              </div>
+                <span className="jstep-body">
+                  <span className="jstep-title">{s.title}</span>
+                  {s.subtitle && <span className="study-meta">{s.subtitle}</span>}
+                </span>
+                <span className="jstep-toggle" aria-hidden="true">{isOpen ? '−' : '+'}</span>
+              </button>
 
-              <div className="jstep-actions">
-                {s.type === 'grammar' && s.href && (
-                  <a className="btn ghost" href={s.href}>Открыть урок</a>
-                )}
-                {(s.type === 'vocab' || s.type === 'review') && (
-                  <button className="btn ghost" onClick={() => setOpen(isOpen ? null : s.id)}>
-                    {isOpen ? 'Свернуть' : s.type === 'vocab' ? 'Тренировать' : 'Повторить'}
-                  </button>
-                )}
-              </div>
+              {isOpen && (
+                <div className="jstep-panel">
+                  {s.type === 'grammar' && s.html && (
+                    <div className="lesson prose" dangerouslySetInnerHTML={{ __html: s.html }} />
+                  )}
+                  {(s.type === 'vocab' || s.type === 'review') && (
+                    <StudySession deck={deck} week={s.type === 'vocab' ? s.week : undefined} />
+                  )}
 
-              {isOpen && (s.type === 'vocab' || s.type === 'review') && (
-                <div className="jstep-study">
-                  <StudySession deck={deck} week={s.type === 'vocab' ? s.week : undefined} />
+                  <div className="jstep-nav">
+                    <button className="btn ghost" onClick={() => goTo(i - 1)} disabled={i === 0}>← Предыдущий</button>
+                    <label className="jstep-check">
+                      <input type="checkbox" checked={isDone} onChange={() => toggleDone(s.id)} /> пройдено
+                    </label>
+                    <button className="btn ghost" onClick={() => goTo(i + 1)} disabled={i === steps.length - 1}>Следующий →</button>
+                  </div>
                 </div>
               )}
             </li>

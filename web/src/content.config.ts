@@ -8,7 +8,7 @@ const weeks = defineCollection({
 });
 
 const docs = defineCollection({
-  loader: glob({ pattern: '{grammar-cheatsheet,phrases}.md', base: '..' }),
+  loader: glob({ pattern: 'phrases.md', base: '..' }),
 });
 
 export const collections = { weeks, docs };
