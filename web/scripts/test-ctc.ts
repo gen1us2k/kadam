@@ -50,6 +50,14 @@ const trimmed = trimSilence(new Float32Array([...sil, ...loud, ...sil]), rate);
 check('trim removes silence', trimmed.length < 3 * rate && trimmed.length >= rate, trimmed.length);
 check('all-silence unchanged', trimSilence(sil, rate).length === sil.length);
 
+// Regression: a loud click transient (button/mic pop) must NOT raise the gate above speech level.
+// With a max-relative gate this trimmed a 2 s utterance down to the click alone (94% -> 33% bug).
+const quiet = new Float32Array(2 * rate);
+for (let i = 0; i < quiet.length; i++) quiet[i] = Math.sin(i * 0.1) * 0.05;
+const click = new Float32Array(Math.round(0.03 * rate)).fill(0.9);
+const clicky = trimSilence(new Float32Array([...click, ...sil, ...quiet, ...sil]), rate);
+check('click does not eat speech', clicky.length >= quiet.length, clicky.length, quiet.length);
+
 console.log(`parity: greedy=${JSON.stringify(greedy)} percent=${percent} maxGopDiff=${maxDiff.toExponential(2)}`);
 console.log(fail === 0 ? '\nALL TESTS PASSED' : `\n${fail} TEST(S) FAILED`);
 process.exit(fail === 0 ? 0 : 1);

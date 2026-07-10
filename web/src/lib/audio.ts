@@ -66,15 +66,18 @@ export function trimSilence(wave: Float32Array, rate = TARGET_RATE): Float32Arra
   const n = Math.floor(wave.length / win);
   if (n < 2) return wave;
   const energy = new Float32Array(n);
-  let peak = 0;
   for (let w = 0; w < n; w++) {
     let e = 0;
     for (let i = 0; i < win; i++) e += wave[w * win + i] ** 2;
     energy[w] = e / win;
-    peak = Math.max(peak, energy[w]);
   }
-  if (peak === 0) return wave;
-  const gate = peak * 0.02; // -17 dB below the loudest window
+  // Reference = 95th-percentile window energy, NOT the max: a click/pop transient (button, mic)
+  // spans only a window or two but can be 10-20 dB louder than speech — a max-relative gate then
+  // rises above the speech level and trims the whole utterance away.
+  const sorted = Float32Array.from(energy).sort();
+  const ref = sorted[Math.min(n - 1, Math.floor(n * 0.95))];
+  if (ref === 0) return wave;
+  const gate = ref * 0.02; // -17 dB below the robust loud level
   let first = 0;
   while (first < n && energy[first] < gate) first++;
   let last = n - 1;
@@ -84,6 +87,24 @@ export function trimSilence(wave: Float32Array, rate = TARGET_RATE): Float32Arra
   const start = Math.max(0, (first - margin) * win);
   const end = Math.min(wave.length, (last + 1 + margin) * win);
   return wave.slice(start, end);
+}
+
+let playbackCtx: AudioContext | null = null;
+
+/** Play a 16 kHz mono waveform — lets the user hear exactly what the recognizer analyzed. */
+export async function playWave(wave: Float32Array, rate = TARGET_RATE): Promise<void> {
+  if (wave.length === 0) return;
+  playbackCtx ??= new AudioContext({ sampleRate: rate });
+  if (playbackCtx.state === 'suspended') await playbackCtx.resume();
+  const buffer = playbackCtx.createBuffer(1, wave.length, rate);
+  buffer.getChannelData(0).set(wave);
+  const source = playbackCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(playbackCtx.destination);
+  await new Promise<void>((resolve) => {
+    source.onended = () => resolve();
+    source.start();
+  });
 }
 
 /** Decode an encoded audio blob and resample to 16 kHz mono Float32. */

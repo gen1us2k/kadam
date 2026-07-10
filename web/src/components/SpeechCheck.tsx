@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Recorder } from '../lib/audio';
+import { Recorder, playWave } from '../lib/audio';
 import { analyze } from '../lib/asr';
 import type { AsrStatus, Analysis } from '../lib/asr';
 import SpeakButton from './SpeakButton';
@@ -52,6 +52,7 @@ export default function SpeechCheck() {
   const [result, setResult] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<Recorder | null>(null);
+  const lastWaveRef = useRef<Float32Array | null>(null); // what the recognizer actually analyzed
 
   // Release the mic if the user navigates away mid-recording.
   useEffect(() => () => recorderRef.current?.cancel(), []);
@@ -84,6 +85,7 @@ export default function SpeechCheck() {
     setProcessing(true); // guard the stop -> recognize -> score window (mic still settling)
     try {
       const wave = await rec.stop();
+      lastWaveRef.current = wave;
       setResult(await analyze(wave, phrase.ky, setAsrStatus));
     } catch {
       setError('Не удалось распознать. Попробуйте ещё раз.');
@@ -172,6 +174,15 @@ export default function SpeechCheck() {
 
           <div className="study-meta">
             Услышано (открытое распознавание): <b style={{ color: 'var(--text)' }}>{result.transcript || '—'}</b>
+            {lastWaveRef.current && (
+              <button
+                className="say-btn"
+                onClick={() => lastWaveRef.current && playWave(lastWaveRef.current)}
+                title="Прослушать, что именно получила модель (после обрезки тишины)"
+              >
+                ▶ моя запись
+              </button>
+            )}
           </div>
         </div>
       )}
