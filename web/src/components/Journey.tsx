@@ -176,7 +176,7 @@ export default function Journey({ steps, deck }: Props) {
                   )}
                   {s.type === 'drill' && <Drills types={s.drillTasks} onComplete={() => markDone(s.id)} />}
                   {s.type === 'reader' && s.text && <Reader deck={deck} initialText={s.text} autoParse />}
-                  {s.type === 'sentence' && <SentenceBuild tag={s.tag} onComplete={() => markDone(s.id)} />}
+                  {s.type === 'sentence' && <SentenceBuild tag={s.tag} count={15} onComplete={() => markDone(s.id)} />}
                   {s.type === 'exam' && s.tag && (
                     <StepExam deck={deck} tag={s.tag} drillTasks={s.drillTasks} examId={s.id} onPassed={() => markDone(s.id)} />
                   )}
