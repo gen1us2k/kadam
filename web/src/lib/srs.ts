@@ -52,7 +52,8 @@ export function isUnverified(card: Pick<DeckCard, 'tags'>): boolean {
 /** Predicted recall probability right now (0 if never seen). */
 export function retention(state: CardState | undefined, now: number): number {
   if (!state) return 0;
-  return retrievability(Math.max(0, (now - state.last) / DAY), state.s);
+  // Math.max guards a hand-corrupted store where s could be 0 (division → NaN).
+  return retrievability(Math.max(0, (now - state.last) / DAY), Math.max(0.001, state.s));
 }
 
 /** Throttle new-card intake as the review backlog grows, to keep daily load sustainable. */
@@ -126,7 +127,9 @@ export function buildQueue(deck: DeckCard[], store: Store, now: number, opts: Qu
     if (!state) fresh.push(card);
     else if (state.due <= now) due.push(card);
   }
-  const newLimit = opts.newLimit ?? adaptiveNewLimit(due.length);
+  // Adaptive throttle applies to the global mixed session; a tag-scoped station (deliberate
+  // study of one step) keeps the flat base limit so it always introduces new words.
+  const newLimit = opts.newLimit ?? (opts.tag ? BASE_NEW : adaptiveNewLimit(due.length));
   // Verified-first: introduce trusted (curated / verified) words before model-generated ones.
   const orderedFresh = [...fresh].sort((a, b) => Number(isUnverified(a)) - Number(isUnverified(b)));
   const queue = shuffle([...due, ...orderedFresh.slice(0, newLimit)]);

@@ -19,9 +19,11 @@ export default function StatsPanel({ deck }: Props) {
     const store = loadStore();
     setStats(deckStats(deck, store, Date.now()));
     // Weak = lapsing but not yet a leech; leeches are surfaced separately with a call to action.
+    // Filter leeches out of a wider slice so heavy leeches don't starve the weak-words line.
     setWeak(
-      weakestCards(deck, store)
+      weakestCards(deck, store, 20)
         .filter(({ state }) => !isLeech(state))
+        .slice(0, 5)
         .map(({ card, state }) => ({ kg: card.kg, ru: card.ru, lapses: state.lapses })),
     );
     setLeeches(leechCards(deck, store).slice(0, 8).map(({ card, state }) => ({ kg: card.kg, ru: card.ru, lapses: state.lapses })));

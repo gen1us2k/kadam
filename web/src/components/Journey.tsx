@@ -60,13 +60,27 @@ export default function Journey({ steps, deck }: Props) {
   const [dueTotal, setDueTotal] = useState(0);
 
   useEffect(() => {
-    setDone(load());
     const store = loadStore();
     const now = Date.now();
     const m: Record<string, DeckStats> = {};
     for (const s of steps) {
       if (hasMastery(s)) m[s.id] = deckStats(deck, store, now, s.tag);
     }
+    // Persist auto-done once 80% retained is first reached, so progress stays monotonic even as
+    // retention later decays. Only when the key is absent — a manual check/uncheck is respected.
+    const p = load();
+    let changed = false;
+    for (const s of steps) {
+      if (hasMastery(s) && p[s.id] === undefined) {
+        const st = m[s.id];
+        if (st && st.total > 0 && st.retained / st.total >= 0.8) {
+          p[s.id] = true;
+          changed = true;
+        }
+      }
+    }
+    if (changed) save(p);
+    setDone(p);
     setMastery(m);
     setDueTotal(deckStats(deck, store, now).due);
     setReady(true);
