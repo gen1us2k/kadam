@@ -1,4 +1,4 @@
-import weekRaw from '../../../anki/kyrgyz-frequency.csv?raw';
+import stepRaw from '../../../anki/kyrgyz-frequency.csv?raw';
 import corpusRaw from '../../../anki/kyrgyz-corpus-b2.csv?raw';
 
 export interface VocabRow {
@@ -9,7 +9,7 @@ export interface VocabRow {
   tags: string[];
 }
 
-// Rows are comma-separated. The week deck has 3 columns (kg, ru, tags); the B2 corpus has
+// Rows are comma-separated. The step deck has 3 columns (kg, ru, tags); the B2 corpus has
 // 4 (kg, ru, example, tags). Values are authored without commas; we still reconstruct the
 // middle column defensively in case one slips in. tags are always the last field.
 function parse(raw: string, withExample: boolean): VocabRow[] {
@@ -30,11 +30,11 @@ function parse(raw: string, withExample: boolean): VocabRow[] {
     .filter((r) => r.kg && r.ru);
 }
 
-// Merge the curated week deck with the frequency corpus; dedupe by kg+ru (week deck wins).
+// Merge the curated step deck with the frequency corpus; dedupe by kg+ru (step deck wins).
 export function loadVocab(): VocabRow[] {
   const seen = new Set<string>();
   const merged: VocabRow[] = [];
-  for (const row of [...parse(weekRaw, false), ...parse(corpusRaw, true)]) {
+  for (const row of [...parse(stepRaw, false), ...parse(corpusRaw, true)]) {
     const id = `${row.kg}|${row.ru}`;
     if (seen.has(id)) continue;
     seen.add(id);

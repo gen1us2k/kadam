@@ -7,8 +7,8 @@ interface Props {
 
 const { rows } = Astro.props;
 
-const weekTags = [...new Set(rows.flatMap((r) => r.tags).filter((t) => /^week\d+$/.test(t)))].sort();
-const weekLabel = (t: string) => `Нед. ${Number(t.replace('week', ''))}`;
+const stepTags = [...new Set(rows.flatMap((r) => r.tags).filter((t) => /^step\d+$/.test(t)))].sort();
+const stepLabel = (t: string) => `Шаг ${Number(t.replace('step', ''))}`;
 const LEVELS = ['a1', 'a2', 'b1', 'b2'];
 const levelTags = LEVELS.filter((l) => rows.some((r) => r.tags.includes(l)));
 const hasExamples = rows.some((r) => r.example);
@@ -20,7 +20,7 @@ const hasExamples = rows.some((r) => r.example);
     <div class="tag-filters" id="vocab-tags">
       <button class="tag-btn active" data-tag="">Все</button>
       {levelTags.map((t) => <button class="tag-btn" data-tag={t}>{t.toUpperCase()}</button>)}
-      {weekTags.map((t) => <button class="tag-btn" data-tag={t}>{weekLabel(t)}</button>)}
+      {stepTags.map((t) => <button class="tag-btn" data-tag={t}>{stepLabel(t)}</button>)}
     </div>
   </div>
 

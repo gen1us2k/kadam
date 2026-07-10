@@ -1,573 +1,573 @@
 #separator:Comma
 #html:false
 #tags column:3
-Саламатсызбы!,Здравствуйте!,week01 phrases
-Салам!,Привет!,week01 phrases
-Кандайсыз?,Как дела? (вежливо),week01 phrases
-Кандайсың?,Как дела? (на ты),week01 phrases
-Жакшы; рахмат,Хорошо; спасибо,week01 phrases
-Рахмат!,Спасибо!,week01 phrases
-Чоң рахмат!,Большое спасибо!,week01 phrases
-Эч нерсе эмес,Не за что,week01 phrases
-Кечиресиз,Извините,week01 phrases
-Сураныч,Пожалуйста (просьба),week01 phrases
-Ооба,Да,week01 phrases
-Жок,Нет,week01 phrases
-Кош болуңуз!,До свидания!,week01 phrases
-Көрүшкөнчө!,До встречи!,week01 phrases
-Менин атым — ...,Меня зовут ...,week01 phrases
-Сиздин атыңыз ким?,Как вас зовут?,week01 phrases
-Таанышканыма кубанычтамын,Рад познакомиться,week01 phrases
-Болот,Можно; ладно; хорошо,week01 phrases
-Болбойт,Нельзя,week01 phrases
-Мейли,Ладно,week01 phrases
-Азамат!,Молодец!,week01 phrases
-Түшүнбөдүм,Я не понял,week01 phrases
-Кайталаңызчы,Повторите пожалуйста,week01 phrases
-Жайыраак сүйлөңүзчү,Говорите помедленнее пожалуйста,week01 phrases
-мен,я,week01 pronouns
-сен,ты,week01 pronouns
-сиз,вы (вежливо),week01 pronouns
-ал,он; она; оно,week01 pronouns
-биз,мы,week01 pronouns
-силер,вы (мн.ч.),week01 pronouns
-сиздер,вы (мн.ч. вежливо),week01 pronouns
-алар,они,week01 pronouns
-бул,это; этот,week01 pronouns
-ошол,тот,week01 pronouns
-тигил,вон тот,week01 pronouns
-өзү,сам,week01 pronouns
-баары,все; всё,week01 pronouns
-эч ким,никто,week01 pronouns
-эч нерсе,ничто; ничего,week01 pronouns
-башка,другой,week01 pronouns
-ар бир,каждый,week01 pronouns
-ким?,кто?,week01 questions
-эмне?,что?,week01 questions
-бир,один,week01 numbers
-эки,два,week01 numbers
-үч,три,week01 numbers
-төрт,четыре,week01 numbers
-беш,пять,week01 numbers
-алты,шесть,week01 numbers
-жети,семь,week01 numbers
-сегиз,восемь,week01 numbers
-тогуз,девять,week01 numbers
-он,десять,week01 numbers
-бар,есть; имеется,week01 basics
-жок (нет),нет; не имеется,week01 basics
-жакшы,хороший; хорошо,week01 basics
-жаман,плохой; плохо,week01 basics
-чоң,большой,week01 basics
-кичине,маленький,week01 basics
-жаңы,новый,week01 basics
-эски,старый (о вещах),week01 basics
-бул жерде,здесь,week01 basics
-ал жерде,там,week01 basics
-да,тоже; и,week01 basics
-эмес,не (отрицание при имени),week01 basics
-нерсе,вещь; штука,week01 basics
-адам,человек,week01 basics
-киши,человек; некто,week01 basics
-эл,народ; люди,week01 basics
-болуу,быть; становиться,week02 verbs
-баруу,идти; ехать,week02 verbs
-келүү,приходить; приезжать,week02 verbs
-кетүү,уходить; уезжать,week02 verbs
-алуу,брать; покупать,week02 verbs
-берүү,давать,week02 verbs
-жеш,есть; кушать,week02 verbs
-ичүү,пить,week02 verbs
-көрүү,видеть,week02 verbs
-кароо,смотреть,week02 verbs
-угуу,слышать; слушать,week02 verbs
-билүү,знать,week02 verbs
-түшүнүү,понимать,week02 verbs
-айтуу,сказать; говорить,week02 verbs
-сүйлөө,разговаривать,week02 verbs
-окуу,читать; учиться,week02 verbs
-жазуу,писать,week02 verbs
-иштөө,работать,week02 verbs
-жашоо,жить,week02 verbs
-кылуу,делать,week02 verbs
-жасоо,делать; изготавливать,week02 verbs
-туруу,вставать; стоять,week02 verbs
-отуруу,сидеть; садиться,week02 verbs
-жатуу,лежать,week02 verbs
-уктоо,спать,week02 verbs
-ойгонуу,просыпаться,week02 verbs
-каалоо,хотеть; желать,week02 verbs
-сүйүү,любить,week02 verbs
-күтүү,ждать,week02 verbs
-баштоо,начинать,week02 verbs
-бүтүрүү,заканчивать,week02 verbs
-ойлоо,думать,week02 verbs
-мугалим,учитель,week02 professions
-дарыгер,врач,week02 professions
-окуучу,ученик,week02 professions
-студент,студент,week02 professions
-сатуучу,продавец,week02 professions
-айдоочу,водитель,week02 professions
-ашпозчу,повар,week02 professions
-инженер,инженер,week02 professions
-жаш,молодой; возраст,week02 adjectives
-кары,старый (о человеке),week02 adjectives
-узун,длинный,week02 adjectives
-кыска,короткий,week02 adjectives
-бийик,высокий,week02 adjectives
-жапыз,низкий,week02 adjectives
-оор,тяжёлый; трудный,week02 adjectives
-жеңил,лёгкий,week02 adjectives
-таза,чистый,week02 adjectives
-кир,грязный; грязь,week02 adjectives
-күчтүү,сильный,week02 adjectives
-сулуу,красивый (о человеке),week02 adjectives
-кооз,красивый (о вещах),week02 adjectives
-акылдуу,умный,week02 adjectives
-оңой,лёгкий; простой,week02 adjectives
-кыйын,трудный; сложный,week02 adjectives
-туура,правильный; верно,week02 adjectives
-маанилүү,важный,week02 adjectives
-кызыктуу,интересный,week02 adjectives
-абдан,очень,week02 adverbs
-өтө,очень; слишком,week02 adverbs
-аз,мало,week02 adverbs
-көп,много,week02 adverbs
-бир аз,немного,week02 adverbs
-дагы,ещё; снова,week02 adverbs
-эми,теперь,week02 adverbs
-үй,дом,week03 places
-батир,квартира,week03 places
-мектеп,школа,week03 places
-университет,университет,week03 places
-жумуш,работа,week03 places
-дүкөн,магазин,week03 places
-базар,базар; рынок,week03 places
-дарыкана,аптека,week03 places
-оорукана,больница,week03 places
-банк,банк,week03 places
-аэропорт,аэропорт,week03 places
-вокзал,вокзал,week03 places
-шаар,город,week03 places
-айыл,село; деревня,week03 places
-көчө,улица,week03 places
-жол,дорога; путь,week03 places
-аянт,площадь,week03 places
-парк,парк,week03 places
-мейманкана,гостиница,week03 places
-ашкана,кухня; столовая,week03 places
-мечит,мечеть,week03 places
-өлкө,страна,week03 places
-дүйнө,мир (свет),week03 places
-жер,земля; место,week03 places
-машина,машина; автомобиль,week03 transport
-автобус,автобус,week03 transport
-маршрутка,маршрутка,week03 transport
-такси,такси,week03 transport
-поезд,поезд,week03 transport
-учак,самолёт,week03 transport
-велосипед,велосипед,week03 transport
-аялдама,остановка,week03 transport
-жүргүнчү,пассажир,week03 transport
-билет,билет,week03 transport
-кайда?,где?; куда?,week03 questions
-кайдан?,откуда?,week03 questions
-оң,правый; право,week03 directions
-сол,левый; лево,week03 directions
-түз,прямо; прямой,week03 directions
-жогору,вверх; верх,week03 directions
-төмөн,вниз; низ,week03 directions
-жакын,близко; близкий,week03 directions
-алыс,далеко; далёкий,week03 directions
-жанында,рядом (с),week03 directions
-ичинде,внутри,week03 directions
-үстүндө,на; сверху,week03 directions
-астында,под,week03 directions
-ортосунда,между; посередине,week03 directions
-менен,с (кем; чем),week03 postpositions
-мага,мне,week03 pronouns
-сага,тебе,week03 pronouns
-ага,ему; ей,week03 pronouns
-үй-бүлө,семья,week04 family
-ата,отец,week04 family
-апа,мама,week04 family
-эне,мать,week04 family
-бала,ребёнок,week04 family
-балдар,дети,week04 family
-уул,сын,week04 family
-кыз,дочь; девочка; девушка,week04 family
-ага (туугандык),старший брат,week04 family
-байке,старший брат; уважительное обращение к мужчине,week04 family
-ини,младший брат,week04 family
-эже,старшая сестра,week04 family
-сиңди,младшая сестра (для женщины),week04 family
-карындаш,младшая сестра (для мужчины),week04 family
-чоң ата,дедушка,week04 family
-чоң эне,бабушка,week04 family
-күйөө,муж,week04 family
-аял,жена; женщина,week04 family
-эркек,мужчина,week04 family
-жигит,парень,week04 family
-небере,внук; внучка,week04 family
-тууган,родственник,week04 family
-дос,друг,week04 family
-курбу,подруга; сверстница,week04 family
-эшик,дверь,week04 home
-терезе,окно,week04 home
-үстөл,стол,week04 home
-отургуч,стул,week04 home
-керебет,кровать,week04 home
-төшөк,постель,week04 home
-жууркан,одеяло,week04 home
-жаздык,подушка,week04 home
-күзгү,зеркало,week04 home
-самын,мыло,week04 home
-сүлгү,полотенце,week04 home
-ачкыч,ключ,week04 home
-китеп,книга,week04 home
-дептер,тетрадь,week04 home
-калем,ручка; карандаш,week04 home
-телефон,телефон,week04 home
-компьютер,компьютер,week04 home
-баштык,сумка; пакет,week04 home
-убакыт,время,week04 time
-күн,день; солнце,week04 time
-түн,ночь,week04 time
-эртең менен,утро; утром,week04 time
-түш,полдень; сон (сновидение),week04 time
-кеч,вечер; поздно,week04 time
-бүгүн,сегодня,week04 time
-кечээ,вчера,week04 time
-эртең,завтра,week04 time
-азыр,сейчас,week04 time
-кийин,потом; после,week04 time
-мурун,раньше; до (также: нос),week04 time
-эрте,рано,week04 time
-дайыма,всегда,week04 time
-кээде,иногда,week04 time
-эч качан,никогда,week04 time
-жыл,год,week04 time
-ай,месяц; луна,week04 time
-жума,неделя; пятница,week04 time
-былтыр,в прошлом году,week04 time
-быйыл,в этом году,week04 time
-жакында,недавно; скоро,week04 time
-он бир,одиннадцать,week05 numbers
-жыйырма,двадцать,week05 numbers
-отуз,тридцать,week05 numbers
-кырк,сорок,week05 numbers
-элүү,пятьдесят,week05 numbers
-алтымыш,шестьдесят,week05 numbers
-жетимиш,семьдесят,week05 numbers
-сексен,восемьдесят,week05 numbers
-токсон,девяносто,week05 numbers
-жүз,сто,week05 numbers
-миң,тысяча,week05 numbers
-жарым,половина,week05 numbers
-биринчи,первый,week05 numbers
-экинчи,второй,week05 numbers
-акыркы,последний,week05 numbers
-дүйшөмбү,понедельник,week05 days
-шейшемби,вторник,week05 days
-шаршемби,среда,week05 days
-бейшемби,четверг,week05 days
-жума (күн),пятница,week05 days
-ишемби,суббота,week05 days
-жекшемби,воскресенье,week05 days
-саат,час; часы,week05 time
-мүнөт,минута,week05 time
-качан?,когда?,week05 questions
-канча?,сколько?,week05 questions
-кандай?,какой?; как?,week05 questions
-кайсы?,который?,week05 questions
-эмнеге?,почему?; зачем?,week05 questions
-кантип?,как? (каким образом),week05 questions
-акча,деньги,week05 shopping
-сом,сом (валюта),week05 shopping
-баа,цена,week05 shopping
-арзан,дешёвый,week05 shopping
-кымбат,дорогой,week05 shopping
-сатып алуу,покупать,week05 shopping
-сатуу,продавать,week05 shopping
-төлөө,платить,week05 shopping
-Бул канча турат?,Сколько это стоит?,week05 shopping phrases
-Арзаныраак болобу?,Можно подешевле?,week05 shopping phrases
-Мага ... бериңизчи,Дайте мне ... пожалуйста,week05 shopping phrases
-тамак,еда; пища,week06 food
-нан,хлеб,week06 food
-суу,вода,week06 food
-чай,чай,week06 food
-сүт,молоко,week06 food
-айран,айран (кефир),week06 food
-каймак,сметана; сливки,week06 food
-кымыз,кумыс,week06 food
-эт,мясо,week06 food
-тоок,курица,week06 food
-балык,рыба,week06 food
-жумуртка,яйцо,week06 food
-күрүч,рис,week06 food
-кесме,лапша,week06 food
-картөшкө,картофель,week06 food
-помидор,помидор,week06 food
-бадыраң,огурец,week06 food
-пияз,лук,week06 food
-сабиз,морковь,week06 food
-алма,яблоко,week06 food
-жүзүм,виноград,week06 food
-өрүк,абрикос; урюк,week06 food
-коон,дыня,week06 food
-дарбыз,арбуз,week06 food
-жаңгак,орех,week06 food
-туз,соль,week06 food
-кант,сахар,week06 food
-мурч,перец,week06 food
-май,масло; жир,week06 food
-бал,мёд,week06 food
-боорсок,боорсок,week06 food
-палоо,плов,week06 food
-лагман,лагман,week06 food
-манты,манты,week06 food
-шорпо,бульон; суп,week06 food
-куурдак,куурдак (жаркое),week06 food
-самса,самса,week06 food
-даамдуу,вкусный,week06 food
-таттуу,сладкий,week06 food
-ачуу,горький; острый (также: открывать),week06 food
-кашык,ложка,week06 food
-айры,вилка,week06 food
-бычак,нож,week06 food
-табак,тарелка; блюдо,week06 food
-чыны,пиала; чашка,week06 food
-идиш,посуда,week06 food
-казан,казан; котёл,week06 food
-баш,голова,week06 body
-чач,волосы,week06 body
-көз,глаз,week06 body
-кулак,ухо,week06 body
-ооз,рот,week06 body
-тиш,зуб,week06 body
-тил,язык (орган и речь),week06 body
-моюн,шея,week06 body
-ийин,плечо,week06 body
-кол,рука,week06 body
-манжа,палец,week06 body
-көкүрөк,грудь,week06 body
-курсак,живот,week06 body
-жон,спина,week06 body
-бут,нога,week06 body
-тизе,колено,week06 body
-жүрөк,сердце,week06 body
-кан,кровь,week06 body
-сөөк,кость,week06 body
-дары,лекарство,week06 health
-ооруу,болезнь; болеть,week06 health
-ден соолук,здоровье,week06 health
-чарчоо,уставать,week06 health
-керек,нужно; надо,week06 modality
-мүмкүн,возможно; может быть,week06 modality
-сөзсүз,обязательно,week06 modality
-Курсагым ачты,Я проголодался,week06 health phrases
-Суусадым,Я хочу пить,week06 health phrases
-Башым ооруп жатат,У меня болит голова,week06 health phrases
-ысык,горячий; жарко,week07 weather
-суук,холодный; холодно,week07 weather
-жылуу,тёплый,week07 weather
-салкын,прохладный,week07 weather
-аба ырайы,погода,week07 weather
-аба,воздух,week07 weather
-шамал,ветер,week07 weather
-жамгыр,дождь,week07 weather
-кар,снег,week07 weather
-булут,облако; туча,week07 weather
-асман,небо,week07 nature
-жылдыз,звезда,week07 nature
-тоо,гора,week07 nature
-көл,озеро,week07 nature
-дарыя,река,week07 nature
-токой,лес,week07 nature
-талаа,поле; степь,week07 nature
-таш,камень,week07 nature
-кум,песок,week07 nature
-от,огонь,week07 nature
-гүл,цветок,week07 nature
-дарак,дерево,week07 nature
-чөп,трава,week07 nature
-ат,лошадь (также: имя),week07 animals
-уй,корова,week07 animals
-кой,овца,week07 animals
-эчки,коза,week07 animals
-төө,верблюд,week07 animals
-ит,собака,week07 animals
-мышык,кошка,week07 animals
-чычкан,мышь,week07 animals
-куш,птица,week07 animals
-жылан,змея,week07 animals
-карышкыр,волк,week07 animals
-аюу,медведь,week07 animals
-түлкү,лиса,week07 animals
-коён,заяц,week07 animals
-чуркоо,бегать,week07 verbs
-басуу,ходить; шагать,week07 verbs
-секирүү,прыгать,week07 verbs
-учуу,летать,week07 verbs
-сүзүү,плавать,week07 verbs
-айдоо,водить (машину); гнать,week07 verbs
-токтоо,останавливаться,week07 verbs
-кайтып келүү,возвращаться,week07 verbs
-жөнөө,отправляться,week07 verbs
-шашуу,спешить,week07 verbs
-жетүү,добираться; достигать,week07 verbs
-өтүү,проходить; переходить,week07 verbs
-кирүү,входить,week07 verbs
-чыгуу,выходить; подниматься,week07 verbs
-түшүү,спускаться; выходить (из транспорта); понимать (түшүнүү),week07 verbs
-жуу,мыть,week07 verbs
-тазалоо,чистить; убирать,week07 verbs
-бышыруу,варить; готовить (еду),week07 verbs
-даярдоо,готовить; подготавливать,week07 verbs
-оңдоо,чинить; исправлять,week07 verbs
-бузуу,ломать; портить,week07 verbs
-көтөрүү,поднимать; нести,week07 verbs
-таштоо,бросать; оставлять,week07 verbs
-коюу,ставить; класть,week07 verbs
-алып келүү,приносить,week07 verbs
-алып баруу,относить; отвозить,week07 verbs
-алып кетүү,забирать с собой,week07 verbs
-суроо,спрашивать; вопрос,week07 verbs
-жооп берүү,отвечать,week07 verbs
-жардам берүү,помогать,week07 verbs
-издөө,искать,week07 verbs
-табуу,находить,week07 verbs
-жоготуу,терять,week07 verbs
-жабуу,закрывать,week07 verbs
-чалуу,звонить,week07 verbs
-жиберүү,отправлять,week07 verbs
-жолугуу,встречаться,week07 verbs
-таанышуу,знакомиться,week07 verbs
-үйрөнүү,изучать; учиться,week07 verbs
-үйрөтүү,обучать,week07 verbs
-эстөө,помнить; вспоминать,week07 verbs
-унутуу,забывать,week07 verbs
-ойноо,играть,week07 verbs
-ырдоо,петь,week07 verbs
-бийлөө,танцевать,week07 verbs
-күлүү,смеяться,week07 verbs
-ыйлоо,плакать,week07 verbs
-эс алуу,отдыхать,week07 verbs
-кийүү,надевать,week07 verbs
-чечүү,снимать (одежду); решать,week07 verbs
-жагуу,нравиться (мага жагат),week07 verbs
-жана,и,week07 conjunctions
-же,или,week07 conjunctions
-бирок,но,week07 conjunctions
-анан,потом; затем,week07 conjunctions
-анткени,потому что,week07 conjunctions
-себеби,потому что; причина,week07 conjunctions
-ошондуктан,поэтому,week07 conjunctions
-эгер,если,week07 conjunctions
-үчүн,для; ради,week07 postpositions
-жөнүндө,о; про,week07 postpositions
-чейин,до (предела),week07 postpositions
-кийим,одежда,week08 clothes
-көйнөк,платье; рубашка,week08 clothes
-шым,брюки; штаны,week08 clothes
-бут кийим,обувь,week08 clothes
-өтүк,сапоги,week08 clothes
-байпак,носки,week08 clothes
-калпак,калпак; шапка,week08 clothes
-мээлей,перчатки; варежки,week08 clothes
-имарат,здание,week08 city
-көпүрө,мост,week08 city
-эстелик,памятник,week08 city
-дарек,адрес,week08 city
-багыт,направление,week08 city
-жарык,свет; светлый,week08 city
-кесип,профессия,week08 work
-айлык,зарплата,week08 work
-жолугушуу,встреча,week08 work
-чогулуш,собрание,week08 work
-тапшырма,задание,week08 work
-сабак,урок,week08 work
-сынак,экзамен,week08 work
-ката,ошибка,week08 work
-мисал,пример,week08 work
-сөз,слово,week08 work
-сүйлөм,предложение (фраза),week08 work
-жооп,ответ,week08 work
-маани,смысл; значение,week08 work
-тез,быстро; быстрый,week08 adverbs
-жай,медленно (также: лето),week08 adverbs
-акырын,медленно; тихо,week08 adverbs
-катуу,громко; сильно; твёрдый,week08 adverbs
-начар,плохо; слабый,week08 adverbs
-кайра,снова; обратно,week08 adverbs
-балким,возможно,week08 adverbs
-албетте,конечно,week08 adverbs
-чын,правда; истинный,week08 adverbs
-чынында,на самом деле,week08 adverbs
-мисалы,например,week08 adverbs
-кенен,широкий; просторный,week08 adjectives
-тар,узкий; тесный,week08 adjectives
-бош,пустой; свободный,week08 adjectives
-толук,полный; целый,week08 adjectives
-ачык,открытый; ясный,week08 adjectives
-жабык,закрытый,week08 adjectives
-бай,богатый,week08 adjectives
-кедей,бедный,week08 adjectives
-даяр,готовый,week08 adjectives
-алсыз,слабый,week08 adjectives
-кубаныч,радость,week09 emotions
-кайгы,горе; печаль,week09 emotions
-коркуу,бояться; страх,week09 emotions
-сүйүнүү,радоваться,week09 emotions
-капа болуу,огорчаться; обижаться,week09 emotions
-ачуулануу,сердиться,week09 emotions
-уялуу,стесняться; стыдиться,week09 emotions
-бактылуу,счастливый,week09 emotions
-боорукер,добрый; отзывчивый,week09 emotions
-ак көңүл,добродушный,week09 emotions
-сараң,жадный,week09 emotions
-жалкоо,ленивый,week09 emotions
-эмгекчил,трудолюбивый,week09 emotions
-калп,ложь,week09 emotions
-Менимче,По-моему,week09 opinions phrases
-Мен макулмун,Я согласен,week09 opinions phrases
-Макул эмесмин,Я не согласен,week09 opinions phrases
-Билбейм,Не знаю,week09 opinions phrases
-Кызык экен!,Интересно!,week09 opinions phrases
-Мага ... жагат,Мне нравится ...,week09 opinions phrases
-Мага ... жакпайт,Мне не нравится ...,week09 opinions phrases
-кабар,новость; весть,week10 news
-жаңылык,новость,week10 news
-маалымат,информация,week10 news
-окуя,событие; происшествие,week10 news
-өкмөт,правительство,week10 news
-мамлекет,государство,week10 news
-мыйзам,закон,week10 news
-шайлоо,выборы,week10 news
-согуш,война,week10 news
-тынчтык,мир; спокойствие,week10 news
-коом,общество,week10 news
-саясат,политика,week10 news
-билим,знание; образование,week10 news
-илим,наука,week10 news
-маданият,культура,week10 news
-тарых,история,week10 news
-дин,религия,week10 news
-маек,беседа; интервью,week10 news
-гезит,газета,week11 reading
-макала,статья,week11 reading
-жомок,сказка,week11 reading
-ыр,песня; стихотворение,week11 reading
-сөздүк,словарь,week11 reading
-тамга,буква,week11 reading
-барак,лист; страница,week11 reading
-сүрөт,картина; фотография,week11 reading
-жарнама,реклама,week11 reading
-кулактандыруу,объявление,week11 reading
-эскертүү,предупреждение; напоминание,week11 reading
-белги,знак; метка,week11 reading
-жашоо (зат атооч),жизнь,week11 misc
-өмүр,жизнь (продолжительность),week11 misc
-ысым,имя (официальное),week11 misc
-күч,сила,week11 misc
+Саламатсызбы!,Здравствуйте!,step01 phrases
+Салам!,Привет!,step01 phrases
+Кандайсыз?,Как дела? (вежливо),step01 phrases
+Кандайсың?,Как дела? (на ты),step01 phrases
+Жакшы; рахмат,Хорошо; спасибо,step01 phrases
+Рахмат!,Спасибо!,step01 phrases
+Чоң рахмат!,Большое спасибо!,step01 phrases
+Эч нерсе эмес,Не за что,step01 phrases
+Кечиресиз,Извините,step01 phrases
+Сураныч,Пожалуйста (просьба),step01 phrases
+Ооба,Да,step01 phrases
+Жок,Нет,step01 phrases
+Кош болуңуз!,До свидания!,step01 phrases
+Көрүшкөнчө!,До встречи!,step01 phrases
+Менин атым — ...,Меня зовут ...,step01 phrases
+Сиздин атыңыз ким?,Как вас зовут?,step01 phrases
+Таанышканыма кубанычтамын,Рад познакомиться,step01 phrases
+Болот,Можно; ладно; хорошо,step01 phrases
+Болбойт,Нельзя,step01 phrases
+Мейли,Ладно,step01 phrases
+Азамат!,Молодец!,step01 phrases
+Түшүнбөдүм,Я не понял,step01 phrases
+Кайталаңызчы,Повторите пожалуйста,step01 phrases
+Жайыраак сүйлөңүзчү,Говорите помедленнее пожалуйста,step01 phrases
+мен,я,step01 pronouns
+сен,ты,step01 pronouns
+сиз,вы (вежливо),step01 pronouns
+ал,он; она; оно,step01 pronouns
+биз,мы,step01 pronouns
+силер,вы (мн.ч.),step01 pronouns
+сиздер,вы (мн.ч. вежливо),step01 pronouns
+алар,они,step01 pronouns
+бул,это; этот,step01 pronouns
+ошол,тот,step01 pronouns
+тигил,вон тот,step01 pronouns
+өзү,сам,step01 pronouns
+баары,все; всё,step01 pronouns
+эч ким,никто,step01 pronouns
+эч нерсе,ничто; ничего,step01 pronouns
+башка,другой,step01 pronouns
+ар бир,каждый,step01 pronouns
+ким?,кто?,step01 questions
+эмне?,что?,step01 questions
+бир,один,step01 numbers
+эки,два,step01 numbers
+үч,три,step01 numbers
+төрт,четыре,step01 numbers
+беш,пять,step01 numbers
+алты,шесть,step01 numbers
+жети,семь,step01 numbers
+сегиз,восемь,step01 numbers
+тогуз,девять,step01 numbers
+он,десять,step01 numbers
+бар,есть; имеется,step01 basics
+жок (нет),нет; не имеется,step01 basics
+жакшы,хороший; хорошо,step01 basics
+жаман,плохой; плохо,step01 basics
+чоң,большой,step01 basics
+кичине,маленький,step01 basics
+жаңы,новый,step01 basics
+эски,старый (о вещах),step01 basics
+бул жерде,здесь,step01 basics
+ал жерде,там,step01 basics
+да,тоже; и,step01 basics
+эмес,не (отрицание при имени),step01 basics
+нерсе,вещь; штука,step01 basics
+адам,человек,step01 basics
+киши,человек; некто,step01 basics
+эл,народ; люди,step01 basics
+болуу,быть; становиться,step02 verbs
+баруу,идти; ехать,step02 verbs
+келүү,приходить; приезжать,step02 verbs
+кетүү,уходить; уезжать,step02 verbs
+алуу,брать; покупать,step02 verbs
+берүү,давать,step02 verbs
+жеш,есть; кушать,step02 verbs
+ичүү,пить,step02 verbs
+көрүү,видеть,step02 verbs
+кароо,смотреть,step02 verbs
+угуу,слышать; слушать,step02 verbs
+билүү,знать,step02 verbs
+түшүнүү,понимать,step02 verbs
+айтуу,сказать; говорить,step02 verbs
+сүйлөө,разговаривать,step02 verbs
+окуу,читать; учиться,step02 verbs
+жазуу,писать,step02 verbs
+иштөө,работать,step02 verbs
+жашоо,жить,step02 verbs
+кылуу,делать,step02 verbs
+жасоо,делать; изготавливать,step02 verbs
+туруу,вставать; стоять,step02 verbs
+отуруу,сидеть; садиться,step02 verbs
+жатуу,лежать,step02 verbs
+уктоо,спать,step02 verbs
+ойгонуу,просыпаться,step02 verbs
+каалоо,хотеть; желать,step02 verbs
+сүйүү,любить,step02 verbs
+күтүү,ждать,step02 verbs
+баштоо,начинать,step02 verbs
+бүтүрүү,заканчивать,step02 verbs
+ойлоо,думать,step02 verbs
+мугалим,учитель,step02 professions
+дарыгер,врач,step02 professions
+окуучу,ученик,step02 professions
+студент,студент,step02 professions
+сатуучу,продавец,step02 professions
+айдоочу,водитель,step02 professions
+ашпозчу,повар,step02 professions
+инженер,инженер,step02 professions
+жаш,молодой; возраст,step02 adjectives
+кары,старый (о человеке),step02 adjectives
+узун,длинный,step02 adjectives
+кыска,короткий,step02 adjectives
+бийик,высокий,step02 adjectives
+жапыз,низкий,step02 adjectives
+оор,тяжёлый; трудный,step02 adjectives
+жеңил,лёгкий,step02 adjectives
+таза,чистый,step02 adjectives
+кир,грязный; грязь,step02 adjectives
+күчтүү,сильный,step02 adjectives
+сулуу,красивый (о человеке),step02 adjectives
+кооз,красивый (о вещах),step02 adjectives
+акылдуу,умный,step02 adjectives
+оңой,лёгкий; простой,step02 adjectives
+кыйын,трудный; сложный,step02 adjectives
+туура,правильный; верно,step02 adjectives
+маанилүү,важный,step02 adjectives
+кызыктуу,интересный,step02 adjectives
+абдан,очень,step02 adverbs
+өтө,очень; слишком,step02 adverbs
+аз,мало,step02 adverbs
+көп,много,step02 adverbs
+бир аз,немного,step02 adverbs
+дагы,ещё; снова,step02 adverbs
+эми,теперь,step02 adverbs
+үй,дом,step03 places
+батир,квартира,step03 places
+мектеп,школа,step03 places
+университет,университет,step03 places
+жумуш,работа,step03 places
+дүкөн,магазин,step03 places
+базар,базар; рынок,step03 places
+дарыкана,аптека,step03 places
+оорукана,больница,step03 places
+банк,банк,step03 places
+аэропорт,аэропорт,step03 places
+вокзал,вокзал,step03 places
+шаар,город,step03 places
+айыл,село; деревня,step03 places
+көчө,улица,step03 places
+жол,дорога; путь,step03 places
+аянт,площадь,step03 places
+парк,парк,step03 places
+мейманкана,гостиница,step03 places
+ашкана,кухня; столовая,step03 places
+мечит,мечеть,step03 places
+өлкө,страна,step03 places
+дүйнө,мир (свет),step03 places
+жер,земля; место,step03 places
+машина,машина; автомобиль,step03 transport
+автобус,автобус,step03 transport
+маршрутка,маршрутка,step03 transport
+такси,такси,step03 transport
+поезд,поезд,step03 transport
+учак,самолёт,step03 transport
+велосипед,велосипед,step03 transport
+аялдама,остановка,step03 transport
+жүргүнчү,пассажир,step03 transport
+билет,билет,step03 transport
+кайда?,где?; куда?,step03 questions
+кайдан?,откуда?,step03 questions
+оң,правый; право,step03 directions
+сол,левый; лево,step03 directions
+түз,прямо; прямой,step03 directions
+жогору,вверх; верх,step03 directions
+төмөн,вниз; низ,step03 directions
+жакын,близко; близкий,step03 directions
+алыс,далеко; далёкий,step03 directions
+жанында,рядом (с),step03 directions
+ичинде,внутри,step03 directions
+үстүндө,на; сверху,step03 directions
+астында,под,step03 directions
+ортосунда,между; посередине,step03 directions
+менен,с (кем; чем),step03 postpositions
+мага,мне,step03 pronouns
+сага,тебе,step03 pronouns
+ага,ему; ей,step03 pronouns
+үй-бүлө,семья,step04 family
+ата,отец,step04 family
+апа,мама,step04 family
+эне,мать,step04 family
+бала,ребёнок,step04 family
+балдар,дети,step04 family
+уул,сын,step04 family
+кыз,дочь; девочка; девушка,step04 family
+ага (туугандык),старший брат,step04 family
+байке,старший брат; уважительное обращение к мужчине,step04 family
+ини,младший брат,step04 family
+эже,старшая сестра,step04 family
+сиңди,младшая сестра (для женщины),step04 family
+карындаш,младшая сестра (для мужчины),step04 family
+чоң ата,дедушка,step04 family
+чоң эне,бабушка,step04 family
+күйөө,муж,step04 family
+аял,жена; женщина,step04 family
+эркек,мужчина,step04 family
+жигит,парень,step04 family
+небере,внук; внучка,step04 family
+тууган,родственник,step04 family
+дос,друг,step04 family
+курбу,подруга; сверстница,step04 family
+эшик,дверь,step04 home
+терезе,окно,step04 home
+үстөл,стол,step04 home
+отургуч,стул,step04 home
+керебет,кровать,step04 home
+төшөк,постель,step04 home
+жууркан,одеяло,step04 home
+жаздык,подушка,step04 home
+күзгү,зеркало,step04 home
+самын,мыло,step04 home
+сүлгү,полотенце,step04 home
+ачкыч,ключ,step04 home
+китеп,книга,step04 home
+дептер,тетрадь,step04 home
+калем,ручка; карандаш,step04 home
+телефон,телефон,step04 home
+компьютер,компьютер,step04 home
+баштык,сумка; пакет,step04 home
+убакыт,время,step04 time
+күн,день; солнце,step04 time
+түн,ночь,step04 time
+эртең менен,утро; утром,step04 time
+түш,полдень; сон (сновидение),step04 time
+кеч,вечер; поздно,step04 time
+бүгүн,сегодня,step04 time
+кечээ,вчера,step04 time
+эртең,завтра,step04 time
+азыр,сейчас,step04 time
+кийин,потом; после,step04 time
+мурун,раньше; до (также: нос),step04 time
+эрте,рано,step04 time
+дайыма,всегда,step04 time
+кээде,иногда,step04 time
+эч качан,никогда,step04 time
+жыл,год,step04 time
+ай,месяц; луна,step04 time
+жума,неделя; пятница,step04 time
+былтыр,в прошлом году,step04 time
+быйыл,в этом году,step04 time
+жакында,недавно; скоро,step04 time
+он бир,одиннадцать,step05 numbers
+жыйырма,двадцать,step05 numbers
+отуз,тридцать,step05 numbers
+кырк,сорок,step05 numbers
+элүү,пятьдесят,step05 numbers
+алтымыш,шестьдесят,step05 numbers
+жетимиш,семьдесят,step05 numbers
+сексен,восемьдесят,step05 numbers
+токсон,девяносто,step05 numbers
+жүз,сто,step05 numbers
+миң,тысяча,step05 numbers
+жарым,половина,step05 numbers
+биринчи,первый,step05 numbers
+экинчи,второй,step05 numbers
+акыркы,последний,step05 numbers
+дүйшөмбү,понедельник,step05 days
+шейшемби,вторник,step05 days
+шаршемби,среда,step05 days
+бейшемби,четверг,step05 days
+жума (күн),пятница,step05 days
+ишемби,суббота,step05 days
+жекшемби,воскресенье,step05 days
+саат,час; часы,step05 time
+мүнөт,минута,step05 time
+качан?,когда?,step05 questions
+канча?,сколько?,step05 questions
+кандай?,какой?; как?,step05 questions
+кайсы?,который?,step05 questions
+эмнеге?,почему?; зачем?,step05 questions
+кантип?,как? (каким образом),step05 questions
+акча,деньги,step05 shopping
+сом,сом (валюта),step05 shopping
+баа,цена,step05 shopping
+арзан,дешёвый,step05 shopping
+кымбат,дорогой,step05 shopping
+сатып алуу,покупать,step05 shopping
+сатуу,продавать,step05 shopping
+төлөө,платить,step05 shopping
+Бул канча турат?,Сколько это стоит?,step05 shopping phrases
+Арзаныраак болобу?,Можно подешевле?,step05 shopping phrases
+Мага ... бериңизчи,Дайте мне ... пожалуйста,step05 shopping phrases
+тамак,еда; пища,step06 food
+нан,хлеб,step06 food
+суу,вода,step06 food
+чай,чай,step06 food
+сүт,молоко,step06 food
+айран,айран (кефир),step06 food
+каймак,сметана; сливки,step06 food
+кымыз,кумыс,step06 food
+эт,мясо,step06 food
+тоок,курица,step06 food
+балык,рыба,step06 food
+жумуртка,яйцо,step06 food
+күрүч,рис,step06 food
+кесме,лапша,step06 food
+картөшкө,картофель,step06 food
+помидор,помидор,step06 food
+бадыраң,огурец,step06 food
+пияз,лук,step06 food
+сабиз,морковь,step06 food
+алма,яблоко,step06 food
+жүзүм,виноград,step06 food
+өрүк,абрикос; урюк,step06 food
+коон,дыня,step06 food
+дарбыз,арбуз,step06 food
+жаңгак,орех,step06 food
+туз,соль,step06 food
+кант,сахар,step06 food
+мурч,перец,step06 food
+май,масло; жир,step06 food
+бал,мёд,step06 food
+боорсок,боорсок,step06 food
+палоо,плов,step06 food
+лагман,лагман,step06 food
+манты,манты,step06 food
+шорпо,бульон; суп,step06 food
+куурдак,куурдак (жаркое),step06 food
+самса,самса,step06 food
+даамдуу,вкусный,step06 food
+таттуу,сладкий,step06 food
+ачуу,горький; острый (также: открывать),step06 food
+кашык,ложка,step06 food
+айры,вилка,step06 food
+бычак,нож,step06 food
+табак,тарелка; блюдо,step06 food
+чыны,пиала; чашка,step06 food
+идиш,посуда,step06 food
+казан,казан; котёл,step06 food
+баш,голова,step06 body
+чач,волосы,step06 body
+көз,глаз,step06 body
+кулак,ухо,step06 body
+ооз,рот,step06 body
+тиш,зуб,step06 body
+тил,язык (орган и речь),step06 body
+моюн,шея,step06 body
+ийин,плечо,step06 body
+кол,рука,step06 body
+манжа,палец,step06 body
+көкүрөк,грудь,step06 body
+курсак,живот,step06 body
+жон,спина,step06 body
+бут,нога,step06 body
+тизе,колено,step06 body
+жүрөк,сердце,step06 body
+кан,кровь,step06 body
+сөөк,кость,step06 body
+дары,лекарство,step06 health
+ооруу,болезнь; болеть,step06 health
+ден соолук,здоровье,step06 health
+чарчоо,уставать,step06 health
+керек,нужно; надо,step06 modality
+мүмкүн,возможно; может быть,step06 modality
+сөзсүз,обязательно,step06 modality
+Курсагым ачты,Я проголодался,step06 health phrases
+Суусадым,Я хочу пить,step06 health phrases
+Башым ооруп жатат,У меня болит голова,step06 health phrases
+ысык,горячий; жарко,step07 weather
+суук,холодный; холодно,step07 weather
+жылуу,тёплый,step07 weather
+салкын,прохладный,step07 weather
+аба ырайы,погода,step07 weather
+аба,воздух,step07 weather
+шамал,ветер,step07 weather
+жамгыр,дождь,step07 weather
+кар,снег,step07 weather
+булут,облако; туча,step07 weather
+асман,небо,step07 nature
+жылдыз,звезда,step07 nature
+тоо,гора,step07 nature
+көл,озеро,step07 nature
+дарыя,река,step07 nature
+токой,лес,step07 nature
+талаа,поле; степь,step07 nature
+таш,камень,step07 nature
+кум,песок,step07 nature
+от,огонь,step07 nature
+гүл,цветок,step07 nature
+дарак,дерево,step07 nature
+чөп,трава,step07 nature
+ат,лошадь (также: имя),step07 animals
+уй,корова,step07 animals
+кой,овца,step07 animals
+эчки,коза,step07 animals
+төө,верблюд,step07 animals
+ит,собака,step07 animals
+мышык,кошка,step07 animals
+чычкан,мышь,step07 animals
+куш,птица,step07 animals
+жылан,змея,step07 animals
+карышкыр,волк,step07 animals
+аюу,медведь,step07 animals
+түлкү,лиса,step07 animals
+коён,заяц,step07 animals
+чуркоо,бегать,step07 verbs
+басуу,ходить; шагать,step07 verbs
+секирүү,прыгать,step07 verbs
+учуу,летать,step07 verbs
+сүзүү,плавать,step07 verbs
+айдоо,водить (машину); гнать,step07 verbs
+токтоо,останавливаться,step07 verbs
+кайтып келүү,возвращаться,step07 verbs
+жөнөө,отправляться,step07 verbs
+шашуу,спешить,step07 verbs
+жетүү,добираться; достигать,step07 verbs
+өтүү,проходить; переходить,step07 verbs
+кирүү,входить,step07 verbs
+чыгуу,выходить; подниматься,step07 verbs
+түшүү,спускаться; выходить (из транспорта); понимать (түшүнүү),step07 verbs
+жуу,мыть,step07 verbs
+тазалоо,чистить; убирать,step07 verbs
+бышыруу,варить; готовить (еду),step07 verbs
+даярдоо,готовить; подготавливать,step07 verbs
+оңдоо,чинить; исправлять,step07 verbs
+бузуу,ломать; портить,step07 verbs
+көтөрүү,поднимать; нести,step07 verbs
+таштоо,бросать; оставлять,step07 verbs
+коюу,ставить; класть,step07 verbs
+алып келүү,приносить,step07 verbs
+алып баруу,относить; отвозить,step07 verbs
+алып кетүү,забирать с собой,step07 verbs
+суроо,спрашивать; вопрос,step07 verbs
+жооп берүү,отвечать,step07 verbs
+жардам берүү,помогать,step07 verbs
+издөө,искать,step07 verbs
+табуу,находить,step07 verbs
+жоготуу,терять,step07 verbs
+жабуу,закрывать,step07 verbs
+чалуу,звонить,step07 verbs
+жиберүү,отправлять,step07 verbs
+жолугуу,встречаться,step07 verbs
+таанышуу,знакомиться,step07 verbs
+үйрөнүү,изучать; учиться,step07 verbs
+үйрөтүү,обучать,step07 verbs
+эстөө,помнить; вспоминать,step07 verbs
+унутуу,забывать,step07 verbs
+ойноо,играть,step07 verbs
+ырдоо,петь,step07 verbs
+бийлөө,танцевать,step07 verbs
+күлүү,смеяться,step07 verbs
+ыйлоо,плакать,step07 verbs
+эс алуу,отдыхать,step07 verbs
+кийүү,надевать,step07 verbs
+чечүү,снимать (одежду); решать,step07 verbs
+жагуу,нравиться (мага жагат),step07 verbs
+жана,и,step07 conjunctions
+же,или,step07 conjunctions
+бирок,но,step07 conjunctions
+анан,потом; затем,step07 conjunctions
+анткени,потому что,step07 conjunctions
+себеби,потому что; причина,step07 conjunctions
+ошондуктан,поэтому,step07 conjunctions
+эгер,если,step07 conjunctions
+үчүн,для; ради,step07 postpositions
+жөнүндө,о; про,step07 postpositions
+чейин,до (предела),step07 postpositions
+кийим,одежда,step08 clothes
+көйнөк,платье; рубашка,step08 clothes
+шым,брюки; штаны,step08 clothes
+бут кийим,обувь,step08 clothes
+өтүк,сапоги,step08 clothes
+байпак,носки,step08 clothes
+калпак,калпак; шапка,step08 clothes
+мээлей,перчатки; варежки,step08 clothes
+имарат,здание,step08 city
+көпүрө,мост,step08 city
+эстелик,памятник,step08 city
+дарек,адрес,step08 city
+багыт,направление,step08 city
+жарык,свет; светлый,step08 city
+кесип,профессия,step08 work
+айлык,зарплата,step08 work
+жолугушуу,встреча,step08 work
+чогулуш,собрание,step08 work
+тапшырма,задание,step08 work
+сабак,урок,step08 work
+сынак,экзамен,step08 work
+ката,ошибка,step08 work
+мисал,пример,step08 work
+сөз,слово,step08 work
+сүйлөм,предложение (фраза),step08 work
+жооп,ответ,step08 work
+маани,смысл; значение,step08 work
+тез,быстро; быстрый,step08 adverbs
+жай,медленно (также: лето),step08 adverbs
+акырын,медленно; тихо,step08 adverbs
+катуу,громко; сильно; твёрдый,step08 adverbs
+начар,плохо; слабый,step08 adverbs
+кайра,снова; обратно,step08 adverbs
+балким,возможно,step08 adverbs
+албетте,конечно,step08 adverbs
+чын,правда; истинный,step08 adverbs
+чынында,на самом деле,step08 adverbs
+мисалы,например,step08 adverbs
+кенен,широкий; просторный,step08 adjectives
+тар,узкий; тесный,step08 adjectives
+бош,пустой; свободный,step08 adjectives
+толук,полный; целый,step08 adjectives
+ачык,открытый; ясный,step08 adjectives
+жабык,закрытый,step08 adjectives
+бай,богатый,step08 adjectives
+кедей,бедный,step08 adjectives
+даяр,готовый,step08 adjectives
+алсыз,слабый,step08 adjectives
+кубаныч,радость,step09 emotions
+кайгы,горе; печаль,step09 emotions
+коркуу,бояться; страх,step09 emotions
+сүйүнүү,радоваться,step09 emotions
+капа болуу,огорчаться; обижаться,step09 emotions
+ачуулануу,сердиться,step09 emotions
+уялуу,стесняться; стыдиться,step09 emotions
+бактылуу,счастливый,step09 emotions
+боорукер,добрый; отзывчивый,step09 emotions
+ак көңүл,добродушный,step09 emotions
+сараң,жадный,step09 emotions
+жалкоо,ленивый,step09 emotions
+эмгекчил,трудолюбивый,step09 emotions
+калп,ложь,step09 emotions
+Менимче,По-моему,step09 opinions phrases
+Мен макулмун,Я согласен,step09 opinions phrases
+Макул эмесмин,Я не согласен,step09 opinions phrases
+Билбейм,Не знаю,step09 opinions phrases
+Кызык экен!,Интересно!,step09 opinions phrases
+Мага ... жагат,Мне нравится ...,step09 opinions phrases
+Мага ... жакпайт,Мне не нравится ...,step09 opinions phrases
+кабар,новость; весть,step10 news
+жаңылык,новость,step10 news
+маалымат,информация,step10 news
+окуя,событие; происшествие,step10 news
+өкмөт,правительство,step10 news
+мамлекет,государство,step10 news
+мыйзам,закон,step10 news
+шайлоо,выборы,step10 news
+согуш,война,step10 news
+тынчтык,мир; спокойствие,step10 news
+коом,общество,step10 news
+саясат,политика,step10 news
+билим,знание; образование,step10 news
+илим,наука,step10 news
+маданият,культура,step10 news
+тарых,история,step10 news
+дин,религия,step10 news
+маек,беседа; интервью,step10 news
+гезит,газета,step11 reading
+макала,статья,step11 reading
+жомок,сказка,step11 reading
+ыр,песня; стихотворение,step11 reading
+сөздүк,словарь,step11 reading
+тамга,буква,step11 reading
+барак,лист; страница,step11 reading
+сүрөт,картина; фотография,step11 reading
+жарнама,реклама,step11 reading
+кулактандыруу,объявление,step11 reading
+эскертүү,предупреждение; напоминание,step11 reading
+белги,знак; метка,step11 reading
+жашоо (зат атооч),жизнь,step11 misc
+өмүр,жизнь (продолжительность),step11 misc
+ысым,имя (официальное),step11 misc
+күч,сила,step11 misc

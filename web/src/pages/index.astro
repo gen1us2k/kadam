@@ -17,17 +17,17 @@ function renderMd(md: string): string {
 }
 
 const deck = loadVocab();
-const entries = (await getCollection('weeks')).sort((a, b) => a.id.localeCompare(b.id));
-const weeks = entries.map((entry) => ({
+const entries = (await getCollection('steps')).sort((a, b) => a.id.localeCompare(b.id));
+const parts = entries.map((entry) => ({
   slug: entry.id.split('/')[0],
   lessons: splitLessons(entry.body ?? '').map((l) => ({ title: l.title, html: renderMd(l.markdown) })),
 }));
-// Survival phrases become an in-path station in week 1 (source stays ../phrases.md).
+// Survival phrases become an in-path station in the first step (source stays ../phrases.md).
 const phrasesEntry = await getEntry('docs', 'phrases');
 const phrasesHtml = phrasesEntry
   ? renderMd((phrasesEntry.body ?? '').replace(/^#[^\n]*\n/, ''))
   : undefined;
-const steps = buildJourney(weeks, deck, { phrasesHtml });
+const steps = buildJourney(parts, deck, { phrasesHtml });
 ---
 
 <Base title="Кыргызча 80/20 — путь изучения" active="/">

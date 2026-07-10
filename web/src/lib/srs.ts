@@ -77,8 +77,8 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export interface QueueOptions {
-  /** Restrict to a tag, e.g. "week03" or a CEFR level like "b1". */
-  week?: string;
+  /** Restrict to a tag, e.g. "step03" or a CEFR level like "b1". */
+  tag?: string;
   /** Max never-seen cards to introduce this session. */
   newLimit?: number;
   /** Hard cap on total session length. */
@@ -90,7 +90,7 @@ export interface QueueOptions {
  * (interleaving beats blocked practice for transfer).
  */
 export function buildQueue(deck: DeckCard[], store: Store, now: number, opts: QueueOptions = {}): DeckCard[] {
-  const pool = opts.week ? deck.filter((c) => c.tags.includes(opts.week as string)) : deck;
+  const pool = opts.tag ? deck.filter((c) => c.tags.includes(opts.tag as string)) : deck;
   const due: DeckCard[] = [];
   const fresh: DeckCard[] = [];
   for (const card of pool) {
@@ -119,8 +119,8 @@ export interface DeckStats {
   lapses: number;
 }
 
-export function deckStats(deck: DeckCard[], store: Store, now: number, week?: string): DeckStats {
-  const pool = week ? deck.filter((c) => c.tags.includes(week)) : deck;
+export function deckStats(deck: DeckCard[], store: Store, now: number, tag?: string): DeckStats {
+  const pool = tag ? deck.filter((c) => c.tags.includes(tag)) : deck;
   const st: DeckStats = { total: pool.length, seen: 0, due: 0, fresh: 0, mature: 0, reps: 0, lapses: 0 };
   for (const card of pool) {
     const state = store[cardId(card)];

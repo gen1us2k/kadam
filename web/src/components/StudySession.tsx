@@ -8,8 +8,8 @@ import SpeakButton from './SpeakButton';
 interface Props {
   /** Full vocabulary deck (also used to draw distractor options). */
   deck: DeckCard[];
-  /** Optional tag filter: a week ("week03") or a CEFR level ("b1"). */
-  week?: string;
+  /** Optional tag filter: a step ("step03") or a CEFR level ("b1"). */
+  tag?: string;
 }
 
 /**
@@ -60,7 +60,7 @@ function modeFor(card: DeckCard, store: Store): Mode {
 
 const KG_LETTERS = ['ң', 'ө', 'ү'];
 
-export default function StudySession({ deck, week }: Props) {
+export default function StudySession({ deck, tag }: Props) {
   const [ready, setReady] = useState(false);
   const storeRef = useRef<Store>({});
   const [queue, setQueue] = useState<DeckCard[]>([]);
@@ -74,10 +74,10 @@ export default function StudySession({ deck, week }: Props) {
   useEffect(() => {
     const store = loadStore();
     storeRef.current = store;
-    setQueue(buildQueue(deck, store, Date.now(), { week }));
+    setQueue(buildQueue(deck, store, Date.now(), { tag }));
     setDaily(loadDaily());
     setReady(true);
-  }, [deck, week]);
+  }, [deck, tag]);
 
   const card = queue[index];
   const mode = useMemo(() => (card ? modeFor(card, storeRef.current) : 'mc'), [card]);
@@ -116,7 +116,7 @@ export default function StudySession({ deck, week }: Props) {
   }
 
   function restart() {
-    setQueue(buildQueue(deck, storeRef.current, Date.now(), { week }));
+    setQueue(buildQueue(deck, storeRef.current, Date.now(), { tag }));
     setIndex(0);
     setAnswered(null);
     setTypedValue('');
@@ -138,7 +138,7 @@ export default function StudySession({ deck, week }: Props) {
 
   if (!ready) return <p className="study-meta">Загрузка…</p>;
 
-  const stats = deckStats(deck, storeRef.current, Date.now(), week);
+  const stats = deckStats(deck, storeRef.current, Date.now(), tag);
   const dailyLine = daily ? `Сегодня: ${daily.done}/${daily.goal}${daily.streak ? ` · 🔥 ${daily.streak}` : ''}` : '';
 
   if (queue.length === 0) {

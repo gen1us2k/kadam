@@ -1,6 +1,6 @@
 // Deterministic Kyrgyz noun morphology: vowel harmony + consonant assimilation.
-// Implements exactly the rules taught in the course lessons (week-01 синхармонизм,
-// week-03/04 cases), so drills always agree with the taught material.
+// Implements exactly the rules taught in the course lessons (step-01 синхармонизм,
+// step-03/04 cases), so drills always agree with the taught material.
 
 const BACK_UNROUNDED = 'аы';
 const FRONT_UNROUNDED = 'еэи';

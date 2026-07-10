@@ -5,22 +5,22 @@ export type StepType = 'grammar' | 'vocab' | 'review' | 'corpus' | 'drill' | 're
 // Frequency-corpus stations, woven into the path at level-appropriate points. Each drills the
 // CEFR band of the B2 corpus (filtered by its level tag) via the same SRS study session.
 const CORPUS_AFTER: Record<string, { level: string; label: string }> = {
-  'week-02': { level: 'a1', label: 'A1' },
-  'week-04': { level: 'a2', label: 'A2' },
-  'week-07': { level: 'b1', label: 'B1' },
-  'week-08': { level: 'b2', label: 'B2' },
+  'step-02': { level: 'a1', label: 'A1' },
+  'step-04': { level: 'a2', label: 'A2' },
+  'step-07': { level: 'b1', label: 'B1' },
+  'step-08': { level: 'b2', label: 'B2' },
 };
 
 // Morphology-drill stations: active production of the suffixes just taught.
 const DRILL_AFTER: Record<string, { tasks: string[]; title: string }> = {
-  'week-02': { tasks: ['Множественное число'], title: 'Дриллы: множественное число' },
-  'week-03': { tasks: ['Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'], title: 'Дриллы: падежи места' },
-  'week-04': { tasks: ['Множественное число', 'Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'], title: 'Дриллы: все суффиксы' },
+  'step-02': { tasks: ['Множественное число'], title: 'Дриллы: множественное число' },
+  'step-03': { tasks: ['Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'], title: 'Дриллы: падежи места' },
+  'step-04': { tasks: ['Множественное число', 'Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'], title: 'Дриллы: все суффиксы' },
 };
 
-// Graded reading steps for the activation weeks — course-vocabulary texts, click-translate.
+// Graded reading steps for the activation part — course-vocabulary texts, click-translate.
 const READER_AFTER: Record<string, { title: string; text: string }> = {
-  'week-10': {
+  'step-10': {
     title: 'Чтение: Менин күнүм',
     text:
       'Менин атым Айбек. Мен Бишкекте жашайм. Үй-бүлөм чоң: атам, апам, эжем жана иним бар. ' +
@@ -28,7 +28,7 @@ const READER_AFTER: Record<string, { title: string; text: string }> = {
       'Анан жумушка барам. Кечинде досторум менен сүйлөшөм. Кээде биз футбол ойнойбуз. ' +
       'Ишемби күнү базарга барабыз. Базарда эт, сүт жана жашылча алабыз.',
   },
-  'week-11': {
+  'step-11': {
     title: 'Чтение: Көлгө саякат',
     text:
       'Кечээ күн абдан жакшы болду. Мен эрте туруп, терезени ачтым. Күн ачык эле. ' +
@@ -46,8 +46,8 @@ export interface JourneyStep {
   subtitle?: string;
   /** For grammar/phrases steps: content pre-rendered to HTML. */
   html?: string;
-  /** For vocab steps: week tag (e.g. "week03") or CEFR level for corpus. */
-  week?: string;
+  /** Deck-filter tag: a step tag (e.g. "step03") for vocab, or a CEFR level for corpus. */
+  tag?: string;
   wordCount?: number;
   /** For drill steps: morphology task filter. */
   drillTasks?: string[];
@@ -55,40 +55,40 @@ export interface JourneyStep {
   text?: string;
 }
 
-export interface WeekLessons {
-  /** Folder slug, e.g. "week-03". */
+export interface StepLessons {
+  /** Content-file slug, e.g. "step-03". */
   slug: string;
   lessons: { title: string; html: string }[];
 }
 
 export interface JourneyExtras {
-  /** Rendered phrases.md — becomes the survival-phrases station in week 1. */
+  /** Rendered phrases.md — becomes the survival-phrases station in the first step. */
   phrasesHtml?: string;
 }
 
 /**
- * Assemble the ordered learning path: each week's lesson steps (content inline), then a
+ * Assemble the ordered learning path: each part's lesson steps (content inline), then a
  * word-training step, a review step, and — where mapped — drill, corpus and reader stations.
  */
-export function buildJourney(weeks: WeekLessons[], deck: DeckCard[], extras: JourneyExtras = {}): JourneyStep[] {
+export function buildJourney(parts: StepLessons[], deck: DeckCard[], extras: JourneyExtras = {}): JourneyStep[] {
   const steps: JourneyStep[] = [];
-  const sorted = [...weeks].sort((a, b) => a.slug.localeCompare(b.slug));
+  const sorted = [...parts].sort((a, b) => a.slug.localeCompare(b.slug));
 
-  for (const wk of sorted) {
-    const tag = wk.slug.replace('-', '');
+  for (const part of sorted) {
+    const tag = part.slug.replace('-', '');
 
-    wk.lessons.forEach((lesson, j) => {
+    part.lessons.forEach((lesson, j) => {
       steps.push({
-        id: `g:${wk.slug}:${j}`,
+        id: `g:${part.slug}:${j}`,
         type: 'grammar',
         title: lesson.title,
         html: lesson.html,
       });
     });
 
-    if (wk.slug === 'week-01' && extras.phrasesHtml) {
+    if (part.slug === 'step-01' && extras.phrasesHtml) {
       steps.push({
-        id: 'ph:week01',
+        id: 'ph:step01',
         type: 'phrases',
         title: 'Фразы выживания',
         subtitle: 'Разговорник: учить с первого дня',
@@ -103,7 +103,7 @@ export function buildJourney(weeks: WeekLessons[], deck: DeckCard[], extras: Jou
         type: 'vocab',
         title: 'Тренировка новых слов',
         subtitle: `${wordCount} слов`,
-        week: tag,
+        tag,
         wordCount,
       });
       steps.push({
@@ -114,10 +114,10 @@ export function buildJourney(weeks: WeekLessons[], deck: DeckCard[], extras: Jou
       });
     }
 
-    const drill = DRILL_AFTER[wk.slug];
+    const drill = DRILL_AFTER[part.slug];
     if (drill) {
       steps.push({
-        id: `d:${wk.slug}`,
+        id: `d:${part.slug}`,
         type: 'drill',
         title: drill.title,
         subtitle: 'Суффиксы на автомат — письменно',
@@ -125,7 +125,7 @@ export function buildJourney(weeks: WeekLessons[], deck: DeckCard[], extras: Jou
       });
     }
 
-    const corpus = CORPUS_AFTER[wk.slug];
+    const corpus = CORPUS_AFTER[part.slug];
     if (corpus) {
       const count = deck.filter((c) => c.tags.includes(corpus.level)).length;
       if (count > 0) {
@@ -134,16 +134,16 @@ export function buildJourney(weeks: WeekLessons[], deck: DeckCard[], extras: Jou
           type: 'corpus',
           title: `Частотный корпус: ${corpus.label}`,
           subtitle: `${count} слов по частоте — учи порциями`,
-          week: corpus.level,
+          tag: corpus.level,
           wordCount: count,
         });
       }
     }
 
-    const reader = READER_AFTER[wk.slug];
+    const reader = READER_AFTER[part.slug];
     if (reader) {
       steps.push({
-        id: `rd:${wk.slug}`,
+        id: `rd:${part.slug}`,
         type: 'reader',
         title: reader.title,
         subtitle: 'Кликайте по словам — словарь подскажет',

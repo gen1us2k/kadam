@@ -46,7 +46,7 @@ const ICON: Record<JourneyStep['type'], string> = {
 const domId = (s: JourneyStep) => `jstep-${s.id.replace(/:/g, '-')}`;
 
 /** Steps whose progress can be derived from SRS data instead of a manual checkbox. */
-const hasMastery = (s: JourneyStep) => (s.type === 'vocab' || s.type === 'corpus') && !!s.week;
+const hasMastery = (s: JourneyStep) => (s.type === 'vocab' || s.type === 'corpus') && !!s.tag;
 
 export default function Journey({ steps, deck }: Props) {
   const [done, setDone] = useState<Progress>({});
@@ -61,7 +61,7 @@ export default function Journey({ steps, deck }: Props) {
     const now = Date.now();
     const m: Record<string, DeckStats> = {};
     for (const s of steps) {
-      if (hasMastery(s)) m[s.id] = deckStats(deck, store, now, s.week);
+      if (hasMastery(s)) m[s.id] = deckStats(deck, store, now, s.tag);
     }
     setMastery(m);
     setDueTotal(deckStats(deck, store, now).due);
@@ -144,7 +144,7 @@ export default function Journey({ steps, deck }: Props) {
                     <div className="lesson prose" dangerouslySetInnerHTML={{ __html: s.html }} />
                   )}
                   {(s.type === 'vocab' || s.type === 'review' || s.type === 'corpus') && (
-                    <StudySession deck={deck} week={s.type === 'review' ? undefined : s.week} />
+                    <StudySession deck={deck} tag={s.type === 'review' ? undefined : s.tag} />
                   )}
                   {s.type === 'drill' && <Drills types={s.drillTasks} />}
                   {s.type === 'reader' && s.text && <Reader deck={deck} initialText={s.text} autoParse />}
