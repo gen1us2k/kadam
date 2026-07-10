@@ -260,6 +260,17 @@ tr[hidden] { display: none; }
 .kbd-btn:hover:not(:disabled) { border-color: var(--accent); }
 .typed-tools .btn { margin-left: auto; }
 
+/* Embedded pronunciation */
+.say-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.95em;
+  padding: 0 0.2em;
+  color: var(--accent);
+}
+.say-btn:disabled { opacity: 0.6; cursor: wait; }
+
 /* Answer feedback */
 .study-feedback { margin-top: 0.8rem; padding: 0.55rem 0.8rem; border-radius: 8px; font-size: 0.95rem; }
 .study-feedback.ok { background: rgba(47, 143, 78, 0.14); }

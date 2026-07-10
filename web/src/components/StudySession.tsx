@@ -3,6 +3,7 @@ import { buildQueue, cardId, deckStats, grade, loadStore, saveStore } from '../l
 import type { DeckCard, Store } from '../lib/srs';
 import { loadDaily, recordAnswer } from '../lib/daily';
 import type { DailyState } from '../lib/daily';
+import SpeakButton from './SpeakButton';
 
 interface Props {
   /** Full vocabulary deck (also used to draw distractor options). */
@@ -58,7 +59,6 @@ function modeFor(card: DeckCard, store: Store): Mode {
 }
 
 const KG_LETTERS = ['ң', 'ө', 'ү'];
-const forvoUrl = (kg: string) => `https://ru.forvo.com/word/${encodeURIComponent(kg)}/#ky`;
 
 export default function StudySession({ deck, week }: Props) {
   const [ready, setReady] = useState(false);
@@ -226,11 +226,14 @@ export default function StudySession({ deck, week }: Props) {
           <div className={`study-feedback ${answered.correct ? 'ok' : 'bad'}`}>
             <div>
               {answered.correct ? '✓ Верно' : `✗ Правильно: ${expectedAnswer}`}
-              {' · '}
-              <a href={forvoUrl(card.kg)} target="_blank" rel="noreferrer">🔊 произношение</a>
+              {' '}
+              <SpeakButton text={card.kg} />
             </div>
-            {card.example && mode !== 'cloze' && <div className="study-example">{card.example}</div>}
-            {mode === 'cloze' && card.example && <div className="study-example">{card.example}</div>}
+            {card.example && (
+              <div className="study-example">
+                {card.example} <SpeakButton text={card.example} title="Озвучить пример" />
+              </div>
+            )}
           </div>
         )}
       </div>

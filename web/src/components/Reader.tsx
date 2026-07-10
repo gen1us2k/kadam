@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { DeckCard } from '../lib/srs';
+import SpeakButton from './SpeakButton';
 
 interface Props {
   deck: DeckCard[];
@@ -80,7 +81,7 @@ export default function Reader({ deck }: Props) {
 
           {selected && (
             <div className="reader-panel">
-              <strong>{selected}</strong>
+              <strong>{selected}</strong> <SpeakButton text={selected} />
               {matches.length === 0 && <p className="study-meta">Нет в словаре курса. Возможно, это форма незнакомого слова.</p>}
               {matches.map((m) => (
                 <p key={`${m.kg}|${m.ru}`}>

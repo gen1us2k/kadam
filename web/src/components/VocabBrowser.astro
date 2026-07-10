@@ -34,7 +34,7 @@ const hasExamples = rows.some((r) => r.example);
       <tbody id="vocab-body">
         {rows.map((r) => (
           <tr data-kg={r.kg.toLowerCase()} data-ru={r.ru.toLowerCase()} data-tags={r.tags.join(' ')}>
-            <td><a href={`https://ru.forvo.com/word/${encodeURIComponent(r.kg)}/#ky`} target="_blank" rel="noreferrer" title="Произношение на Forvo">{r.kg}</a></td>
+            <td>{r.kg} <button class="say-btn" data-say={r.kg} title="Озвучить">🔊</button></td>
             <td>{r.ru}</td>
             {hasExamples && <td class="ex">{r.example ?? ''}</td>}
             <td>{r.tags.join(', ')}</td>
@@ -46,6 +46,19 @@ const hasExamples = rows.some((r) => r.example);
 </div>
 
 <script>
+  import { speak } from '../lib/tts';
+
+  // Delegated pronunciation handler for ~2000 rows.
+  document.getElementById('vocab-body')?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.say-btn');
+    if (!btn?.dataset.say) return;
+    const original = btn.textContent;
+    btn.textContent = '…';
+    speak(btn.dataset.say)
+      .catch(() => {})
+      .finally(() => { btn.textContent = original; });
+  });
+
   const search = document.getElementById('vocab-search') as HTMLInputElement | null;
   const tagWrap = document.getElementById('vocab-tags');
   const count = document.getElementById('vocab-count');

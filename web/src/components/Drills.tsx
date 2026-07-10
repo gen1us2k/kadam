@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { buildDrills } from '../lib/morphology';
 import { recordAnswer } from '../lib/daily';
+import SpeakButton from './SpeakButton';
 
 const KG_LETTERS = ['ң', 'ө', 'ү'];
 const norm = (s: string) => s.toLowerCase().trim();
@@ -83,7 +84,7 @@ export default function Drills({ count = 6 }: { count?: number }) {
         </div>
         {answered !== null && (
           <div className={`study-feedback ${answered ? 'ok' : 'bad'}`}>
-            {answered ? '✓ Верно' : `✗ Правильно: ${drill.answer}`}
+            {answered ? '✓ Верно' : `✗ Правильно: ${drill.answer}`} <SpeakButton text={drill.answer} />
           </div>
         )}
       </div>
