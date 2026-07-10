@@ -21,7 +21,11 @@ for (const [tok, id] of Object.entries(vocabMap as Record<string, number>)) idTo
 const probs = softmaxRows(logits as number[], frames, vocab);
 const greedy = greedyDecode(probs, frames, vocab, idToToken, blank, delimiter);
 const gop = forcedAlignGop(probs, frames, vocab, targetIds as number[], blank);
-const percent = Math.round((gop.reduce((a, b) => a + b, 0) / gop.length) * 100);
+// Same formula as main.ts analyze(): word-gap (delimiter) positions are excluded from percent.
+const delimiterId = (vocabMap as Record<string, number>)[delimiter];
+const scored = (targetIds as number[]).map((id, i) => (id === delimiterId ? null : gop[i])).filter((v): v is number => v !== null);
+const percent = Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100);
+check('fixture exercises no-gap path only', !(targetIds as number[]).includes(delimiterId));
 
 check('greedy transcript parity', greedy === expectedGreedy, greedy, expectedGreedy);
 check('gop length parity', gop.length === (expectedGop as number[]).length);
@@ -29,6 +33,13 @@ let maxDiff = 0;
 for (let i = 0; i < gop.length; i++) maxDiff = Math.max(maxDiff, Math.abs(gop[i] - (expectedGop as number[])[i]));
 check('per-letter gop parity <1e-4', maxDiff < 1e-4, maxDiff);
 check('percent parity', percent === expectedPercent, percent, expectedPercent);
+
+// Exercise the gap-exclusion branch with a synthetic two-word target: [tok, |, tok].
+const gapIds = [targetIds[0], delimiterId, targetIds[1]];
+const gapGop = forcedAlignGop(probs, frames, vocab, gapIds, blank);
+const gapScored = gapIds.map((id, i) => (id === delimiterId ? null : gapGop[i])).filter((v): v is number => v !== null);
+check('gap gop full length', gapGop.length === 3);
+check('gap excluded from percent', gapScored.length === 2 && gapScored[0] === gapGop[0] && gapScored[1] === gapGop[2]);
 
 check('empty target -> []', forcedAlignGop(probs, frames, vocab, [], blank).length === 0);
 check('zero frames -> []', forcedAlignGop(probs, 0, vocab, targetIds as number[], blank).length === 0);

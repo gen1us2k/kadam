@@ -35,9 +35,20 @@ class HttpError extends Error {
 }
 
 // --- model state, loaded once before listen ---
-const session = await ort.InferenceSession.create(`${MODELS_DIR}/model.onnx`);
-const vocab = JSON.parse(await readFile(`${MODELS_DIR}/vocab.json`, 'utf8')) as Record<string, number>;
-const meta = JSON.parse(await readFile(`${MODELS_DIR}/asr-meta.json`, 'utf8')) as AsrMeta;
+async function loadModels() {
+  try {
+    return {
+      session: await ort.InferenceSession.create(`${MODELS_DIR}/model.onnx`),
+      vocab: JSON.parse(await readFile(`${MODELS_DIR}/vocab.json`, 'utf8')) as Record<string, number>,
+      meta: JSON.parse(await readFile(`${MODELS_DIR}/asr-meta.json`, 'utf8')) as AsrMeta,
+    };
+  } catch (e) {
+    throw new Error(`model files not found/loadable in ${MODELS_DIR} — regenerate with web/scripts/export-asr.py`, {
+      cause: e,
+    });
+  }
+}
+const { session, vocab, meta } = await loadModels();
 const idToToken = new Map<number, string>();
 for (const [tok, id] of Object.entries(vocab)) idToToken.set(id, tok);
 
@@ -128,9 +139,13 @@ async function analyze(wavBody: Buffer, target: string) {
   return { transcript, percent, letters };
 }
 
+// Astro dev/preview origins. Same-origin in normal use (astro proxies /api); the header only
+// matters when the page talks to :8000 directly. Widen deliberately if ever deployed.
+const ALLOWED_ORIGINS = new Set(['http://localhost:4321', 'http://localhost:4322']);
+
 const server = createServer(async (req, res) => {
-  // CORS: same-origin in normal use (astro dev proxies /api); allow localhost tooling.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin ?? '';
+  if (ALLOWED_ORIGINS.has(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   const url = new URL(req.url ?? '/', 'http://localhost');
