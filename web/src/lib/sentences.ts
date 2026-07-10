@@ -46,7 +46,7 @@ export const SENTENCES: Sentence[] = [
 ];
 
 /** xorshift32 — deterministic per seed (matches the drills' daily-stable behaviour). */
-function rng(seed: number): () => number {
+export function rng(seed: number): () => number {
   let x = seed || 1;
   return () => {
     x ^= x << 13;
@@ -67,9 +67,4 @@ export function pickSentences(count: number, seed: number, tag?: string): Senten
     [idx[i], idx[j]] = [idx[j], idx[i]];
   }
   return idx.slice(0, count).map((i) => pool[i]);
-}
-
-/** Step tags that have at least one sentence — used to place journey stations. */
-export function sentenceTags(): string[] {
-  return [...new Set(SENTENCES.map((s) => s.tag))];
 }

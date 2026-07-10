@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { pickSentences } from '../lib/sentences';
+import { pickSentences, rng } from '../lib/sentences';
 import { daySeed, recordAnswer } from '../lib/daily';
 import SpeakButton from './SpeakButton';
 
@@ -18,11 +18,7 @@ interface Chip {
 function makeBank(words: string[], seed: number): Chip[] {
   const chips = words.map((w, id) => ({ w, id }));
   if (chips.length < 2) return chips;
-  let x = seed || 1;
-  const next = () => {
-    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-    return Math.abs(x);
-  };
+  const next = rng(seed);
   for (let attempt = 0; attempt < 6; attempt++) {
     for (let i = chips.length - 1; i > 0; i--) {
       const j = next() % (i + 1);
@@ -47,7 +43,7 @@ export default function SentenceBuild({ tag, count = 6 }: Props) {
     [sentence, index],
   );
 
-  if (!sentence) {
+  if (sentences.length === 0) {
     return <div className="study-summary"><p>Здесь пока нет предложений для сборки.</p></div>;
   }
 
