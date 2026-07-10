@@ -1,6 +1,15 @@
 import type { DeckCard } from './srs';
 
-export type StepType = 'grammar' | 'vocab' | 'review';
+export type StepType = 'grammar' | 'vocab' | 'review' | 'corpus';
+
+// Frequency-corpus stations, woven into the path at level-appropriate points. Each drills the
+// CEFR band of the B2 corpus (filtered by its level tag) via the same SRS study session.
+const CORPUS_AFTER: Record<string, { level: string; label: string }> = {
+  'week-02': { level: 'a1', label: 'A1' },
+  'week-04': { level: 'a2', label: 'A2' },
+  'week-07': { level: 'b1', label: 'B1' },
+  'week-08': { level: 'b2', label: 'B2' },
+};
 
 export interface JourneyStep {
   id: string;
@@ -56,6 +65,21 @@ export function buildJourney(weeks: WeekLessons[], deck: DeckCard[]): JourneySte
         title: 'Повторение',
         subtitle: 'Интервальные карточки',
       });
+    }
+
+    const corpus = CORPUS_AFTER[wk.slug];
+    if (corpus) {
+      const count = deck.filter((c) => c.tags.includes(corpus.level)).length;
+      if (count > 0) {
+        steps.push({
+          id: `c:${corpus.level}`,
+          type: 'corpus',
+          title: `Частотный корпус: ${corpus.label}`,
+          subtitle: `${count} слов по частоте — учи порциями`,
+          week: corpus.level,
+          wordCount: count,
+        });
+      }
     }
   }
 

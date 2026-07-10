@@ -280,6 +280,7 @@ tr[hidden] { display: none; }
 .jstep.grammar { border-left-color: #6b7bd6; }
 .jstep.vocab { border-left-color: #2f8f4e; }
 .jstep.review { border-left-color: var(--accent); }
+.jstep.corpus { border-left-color: #c98a1a; }
 .jstep.current { box-shadow: 0 0 0 2px var(--accent-soft); }
 .jstep.open { border-color: var(--accent); }
 .jstep.done .jstep-title { text-decoration: line-through; color: var(--muted); }

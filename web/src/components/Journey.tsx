@@ -34,6 +34,7 @@ const ICON: Record<JourneyStep['type'], string> = {
   grammar: '📖',
   vocab: '🗂️',
   review: '🔁',
+  corpus: '📚',
 };
 
 const domId = (s: JourneyStep) => `jstep-${s.id.replace(/:/g, '-')}`;
@@ -101,8 +102,8 @@ export default function Journey({ steps, deck }: Props) {
                   {s.type === 'grammar' && s.html && (
                     <div className="lesson prose" dangerouslySetInnerHTML={{ __html: s.html }} />
                   )}
-                  {(s.type === 'vocab' || s.type === 'review') && (
-                    <StudySession deck={deck} week={s.type === 'vocab' ? s.week : undefined} />
+                  {(s.type === 'vocab' || s.type === 'review' || s.type === 'corpus') && (
+                    <StudySession deck={deck} week={s.type === 'review' ? undefined : s.week} />
                   )}
 
                   <div className="jstep-nav">
