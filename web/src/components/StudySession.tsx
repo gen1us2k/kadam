@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildQueue, cardId, deckStats, gradeAnswer, isUnverified,
+  buildQueue, cardId, deckStats, grade, gradeAnswer, isUnverified,
   loadLearnList, loadStore, removeFromLearn, saveStore,
 } from '../lib/srs';
 import type { CardState, DeckCard, Grade, Store } from '../lib/srs';
@@ -104,7 +104,7 @@ export default function StudySession({ deck, tag }: Props) {
     const store = storeRef.current;
     const id = cardId(card);
     const prev = store[id];
-    store[id] = gradeAnswer(prev, correct ? 3 : 1, Date.now());
+    store[id] = grade(prev, correct, Date.now());
     saveStore(store);
     removeFromLearn(id); // studied now — no longer needs hand-picked priority
     setDaily(recordAnswer());

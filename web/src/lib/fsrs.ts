@@ -63,7 +63,8 @@ export function fsrsReview(prev: FsrsState, grade: Grade, elapsedDays: number): 
   let s: number;
   if (sameDay) {
     let inc = Math.pow(prev.s, -w[19]) * Math.exp(w[17] * (grade - 3 + w[18]));
-    if (grade >= 2) inc = Math.max(inc, 1);
+    // Reference FSRS clamps only Good/Easy; same-day Hard may shrink stability slightly.
+    if (grade >= 3) inc = Math.max(inc, 1);
     s = prev.s * inc;
   } else {
     const r = retrievability(elapsedDays, prev.s);

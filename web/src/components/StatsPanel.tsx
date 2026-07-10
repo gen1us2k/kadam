@@ -65,8 +65,11 @@ export default function StatsPanel({ deck }: Props) {
 
   const accuracy = stats.reps > 0 ? Math.round(((stats.reps - stats.lapses) / stats.reps) * 100) : 100;
   const retention = stats.seen > 0 ? Math.round((stats.retained / stats.seen) * 100) : 0;
+  // Hide the forecast while the pace is too small to extrapolate honestly (absurd week counts).
   const weeksToTarget =
-    perDay && stats.retained < WORD_TARGET ? Math.ceil((WORD_TARGET - stats.retained) / (perDay * 7)) : null;
+    perDay && perDay >= 0.5 && stats.retained < WORD_TARGET
+      ? Math.ceil((WORD_TARGET - stats.retained) / (perDay * 7))
+      : null;
 
   return (
     <div className="stats-panel">
