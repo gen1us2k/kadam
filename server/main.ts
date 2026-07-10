@@ -8,13 +8,14 @@
 // Run (from server/):  npm install && npm start          # listens on :8000
 // Model files come from server/models/ — regenerate with web/scripts/export-asr.py.
 
-import { createServer, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { extname, resolve, sep } from 'node:path';
+import { extname } from 'node:path';
 import * as ort from 'onnxruntime-node';
 import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
+import { CONTENT_TYPES, cacheControl, resolveStatic, weakEtag } from './static.ts';
 
 const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('./models', import.meta.url));
 // The built web app (astro build -> web/dist) is served from the same port as /api.
@@ -24,23 +25,6 @@ const SAMPLE_RATE = 16000;
 const MAX_SECONDS = 30;
 const MAX_BODY = 44 + MAX_SECONDS * SAMPLE_RATE * 2; // WAV header + 30 s of 16-bit samples
 
-const CONTENT_TYPES: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.mjs': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8',
-  '.wasm': 'application/wasm',
-  '.onnx': 'application/octet-stream',
-  '.txt': 'text/plain; charset=utf-8',
-  '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon',
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.webmanifest': 'application/manifest+json',
-  '.woff2': 'font/woff2',
-  '.map': 'application/json',
-};
 
 interface AsrMeta {
   pad_id: number;
@@ -161,47 +145,38 @@ async function analyze(wavBody: Buffer, target: string) {
   return { transcript, percent, letters };
 }
 
-/** Map a request path to a file inside STATIC_DIR, or null if it escapes the root. */
-function resolveStatic(pathname: string): string | null {
-  let p: string;
-  try {
-    p = decodeURIComponent(pathname);
-  } catch {
-    return null; // malformed percent-encoding
-  }
-  if (p.endsWith('/')) p += 'index.html';
-  else if (!extname(p)) p += '/index.html'; // Astro emits /route/index.html
-  const full = resolve(STATIC_DIR, `.${p}`);
-  if (full !== STATIC_DIR && !full.startsWith(STATIC_DIR + sep)) return null; // path traversal
-  return full;
-}
-
 /** Serve a built static asset from web/dist. Streams (the TTS model is ~113 MB). */
-async function serveStatic(pathname: string, res: ServerResponse): Promise<void> {
-  const file = resolveStatic(pathname);
+async function serveStatic(pathname: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const file = resolveStatic(STATIC_DIR, pathname);
   if (!file) {
     res.writeHead(400).end('bad path');
     return;
   }
   let size: number;
+  let etag: string;
   try {
     const s = await stat(file);
     if (!s.isFile()) throw new Error('not a file');
     size = s.size;
+    etag = weakEtag(s.mtimeMs, s.size);
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('not found');
     return;
   }
-  const ext = extname(file);
-  const headers: Record<string, string> = {
-    'Content-Type': CONTENT_TYPES[ext] ?? 'application/octet-stream',
+  if (req.headers['if-none-match'] === etag) {
+    res.writeHead(304, { ETag: etag, 'Cache-Control': cacheControl(pathname) }).end();
+    return;
+  }
+  res.writeHead(200, {
+    'Content-Type': CONTENT_TYPES[extname(file)] ?? 'application/octet-stream',
     'Content-Length': String(size),
-    // Astro fingerprints _astro/* and the model/wasm are effectively immutable; HTML must revalidate.
-    'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
-  };
-  res.writeHead(200, headers);
+    'Cache-Control': cacheControl(pathname),
+    ETag: etag,
+  });
   createReadStream(file)
-    .on('error', () => res.destroyed || res.end())
+    // Headers are already flushed mid-stream — abort the connection so the client sees a hard
+    // failure instead of a silently truncated 200.
+    .on('error', () => res.destroy())
     .pipe(res);
 }
 
@@ -239,7 +214,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/api/')) return send(404, { error: 'not found' });
     // Everything else: the built web app.
-    if (req.method === 'GET' || req.method === 'HEAD') return void (await serveStatic(url.pathname, res));
+    if (req.method === 'GET' || req.method === 'HEAD') return void (await serveStatic(url.pathname, req, res));
     send(404, { error: 'not found' });
   } catch (e) {
     if (e instanceof HttpError) return send(e.status, { error: e.message });
