@@ -16,6 +16,7 @@ import { extname } from 'node:path';
 import * as ort from 'onnxruntime-node';
 import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
 import { CONTENT_TYPES, cacheControl, resolveStatic, weakEtag } from './static.ts';
+import { parseTokens, tokenize, encodeWav } from './tts.ts';
 
 const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('./models', import.meta.url));
 // The built web app (astro build -> web/dist) is served from the same port as /api.
@@ -24,6 +25,7 @@ const PORT = Number(process.env.PORT ?? 8000);
 const SAMPLE_RATE = 16000;
 const MAX_SECONDS = 30;
 const MAX_BODY = 44 + MAX_SECONDS * SAMPLE_RATE * 2; // WAV header + 30 s of 16-bit samples
+const MAX_TTS_CHARS = 300; // synthesis guard — the app speaks words/short phrases
 
 
 interface AsrMeta {
@@ -47,14 +49,17 @@ async function loadModels() {
       session: await ort.InferenceSession.create(`${MODELS_DIR}/model.onnx`),
       vocab: JSON.parse(await readFile(`${MODELS_DIR}/vocab.json`, 'utf8')) as Record<string, number>,
       meta: JSON.parse(await readFile(`${MODELS_DIR}/asr-meta.json`, 'utf8')) as AsrMeta,
+      ttsSession: await ort.InferenceSession.create(`${MODELS_DIR}/tts/model.onnx`),
+      ttsTokens: parseTokens(await readFile(`${MODELS_DIR}/tts/tokens.txt`, 'utf8')),
     };
   } catch (e) {
-    throw new Error(`model files not found/loadable in ${MODELS_DIR} — regenerate with web/scripts/export-asr.py`, {
-      cause: e,
-    });
+    throw new Error(
+      `model files not found/loadable in ${MODELS_DIR} — ASR: web/scripts/export-asr.py; TTS: models/tts/{model.onnx,tokens.txt}`,
+      { cause: e },
+    );
   }
 }
-const { session, vocab, meta } = await loadModels();
+const { session, vocab, meta, ttsSession, ttsTokens } = await loadModels();
 const idToToken = new Map<number, string>();
 for (const [tok, id] of Object.entries(vocab)) idToToken.set(id, tok);
 
@@ -145,6 +150,22 @@ async function analyze(wavBody: Buffer, target: string) {
   return { transcript, percent, letters };
 }
 
+/** Synthesize Kyrgyz text to a 16 kHz mono WAV via the MMS model. */
+async function synthesizeTts(text: string): Promise<Buffer> {
+  const x = tokenize(text, ttsTokens);
+  if (x.length <= 1) throw new HttpError(422, 'nothing to synthesize');
+  const feeds = {
+    x: new ort.Tensor('int64', x, [1, x.length]),
+    x_length: new ort.Tensor('int64', BigInt64Array.from([BigInt(x.length)]), [1]),
+    noise_scale: new ort.Tensor('float32', Float32Array.from([0.667]), [1]),
+    length_scale: new ort.Tensor('float32', Float32Array.from([1.0]), [1]),
+    noise_scale_w: new ort.Tensor('float32', Float32Array.from([0.8]), [1]),
+  };
+  const out = await ttsSession.run(feeds);
+  const wave = out[ttsSession.outputNames[0]].data as Float32Array;
+  return encodeWav(wave, SAMPLE_RATE);
+}
+
 /** Serve a built static asset from web/dist. Streams (the TTS model is ~113 MB). */
 async function serveStatic(pathname: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const file = resolveStatic(STATIC_DIR, pathname);
@@ -198,6 +219,19 @@ const server = createServer(async (req, res) => {
   try {
     if (req.method === 'OPTIONS') return void res.writeHead(204).end();
     if (req.method === 'GET' && url.pathname === '/api/health') return send(200, { ok: true });
+    if (req.method === 'GET' && url.pathname === '/api/tts') {
+      const text = url.searchParams.get('text')?.trim();
+      if (!text) throw new HttpError(422, 'missing ?text=');
+      if (text.length > MAX_TTS_CHARS) throw new HttpError(413, `text longer than ${MAX_TTS_CHARS} chars`);
+      const wav = await synthesizeTts(text);
+      res.writeHead(200, {
+        'Content-Type': 'audio/wav',
+        'Content-Length': String(wav.length),
+        // Deterministic enough per word; let the browser cache repeated vocabulary.
+        'Cache-Control': 'public, max-age=31536000',
+      });
+      return void res.end(wav);
+    }
     if (req.method === 'POST' && url.pathname === '/api/asr/analyze') {
       const target = url.searchParams.get('target')?.trim();
       if (!target) throw new HttpError(422, 'missing ?target=');

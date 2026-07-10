@@ -7,7 +7,7 @@
     "start": "node main.ts",
     "build-web": "npm --prefix ../web run build",
     "serve": "npm run build-web && npm start",
-    "test": "node test-ctc.ts && node test-static.ts"
+    "test": "node test-ctc.ts && node test-static.ts && node test-tts.ts"
   },
   "dependencies": {
     "onnxruntime-node": "^1.19.2"

@@ -3,15 +3,13 @@ import { speak } from '../lib/tts';
 import type { TtsStatus } from '../lib/tts';
 
 const LABEL: Record<TtsStatus, string> = {
-  downloading: 'загрузка модели… (локально, один раз)',
-  loading: 'запуск…',
   synthesizing: 'синтез…',
   playing: '▶ играет',
   done: '',
   error: 'не вышло — ещё раз?',
 };
 
-/** Embedded Kyrgyz pronunciation button (in-browser MMS TTS). */
+/** Embedded Kyrgyz pronunciation button (backend MMS TTS). */
 export default function SpeakButton({ text, title }: { text: string; title?: string }) {
   const [status, setStatus] = useState<TtsStatus | null>(null);
   const busy = status !== null && status !== 'done' && status !== 'error';

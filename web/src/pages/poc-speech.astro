@@ -7,9 +7,8 @@ import SpeechCheck from '../components/SpeechCheck.tsx';
   <section class="prose">
     <h1>Проверка произношения — PoC</h1>
     <p>
-      Прототип: распознавание кыргызской речи прямо в браузере (wav2vec2-large-xlsr-kyrgyz,
-      экспорт в ONNX int8, запуск через onnxruntime-web — без сервера и ключей). Модель (~338 МБ)
-      скачивается один раз при первой записи.
+      Прототип: распознавание кыргызской речи (wav2vec2-large-xlsr-kyrgyz, ONNX int8) на бэкенде —
+      браузер шлёт короткий WAV, модель (~338 МБ) в браузер не грузится.
     </p>
     <p class="study-meta">
       Оценка произношения — по <b>выравниванию с целевой фразой</b> (CTC forced alignment): раз

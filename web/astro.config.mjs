@@ -20,9 +20,6 @@ export default defineConfig({
       allowedHosts: ['localhost', 'xerox-handclap-baggie.ngrok-free.dev'],
       proxy: { '/api': 'http://localhost:8000' },
     },
-    // Don't prebundle onnxruntime-web: its wasm must stay next to the served module,
-    // otherwise dev requests /node_modules/.vite/deps/*.wasm and 404s.
-    optimizeDeps: { exclude: ['onnxruntime-web'] },
   },
 
   integrations: [react()],
