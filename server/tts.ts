@@ -7,7 +7,8 @@ export function parseTokens(text: string): Map<string, number> {
   const map = new Map<string, number>();
   for (const line of text.split('\n')) {
     if (line.startsWith('  ')) {
-      map.set(' ', Number(line.trim()));
+      const id = Number(line.trim());
+      if (Number.isFinite(id)) map.set(' ', id);
       continue;
     }
     const sep = line.indexOf(' ');

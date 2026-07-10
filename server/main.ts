@@ -166,7 +166,7 @@ async function synthesizeTts(text: string): Promise<Buffer> {
   return encodeWav(wave, SAMPLE_RATE);
 }
 
-/** Serve a built static asset from web/dist. Streams (the TTS model is ~113 MB). */
+/** Serve a built static asset from web/dist. Streamed so large JS bundles don't buffer in memory. */
 async function serveStatic(pathname: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const file = resolveStatic(STATIC_DIR, pathname);
   if (!file) {
