@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Recorder } from '../lib/audio';
-import { recognize } from '../lib/asr';
-import type { AsrStatus } from '../lib/asr';
-import { scorePronunciation } from '../lib/pronunciation';
-import type { Score } from '../lib/pronunciation';
+import { analyze } from '../lib/asr';
+import type { AsrStatus, Analysis } from '../lib/asr';
 import SpeakButton from './SpeakButton';
 
 // A few short PoC phrases — short utterances are where greedy CTC is most legible.
@@ -23,15 +21,25 @@ const ASR_LABEL: Record<AsrStatus, string> = {
   error: 'ошибка распознавания',
 };
 
-const STATUS_COLOR: Record<string, string> = { ok: '#1a7f37', wrong: 'var(--accent)', missing: 'var(--muted)' };
+/** Color a per-letter acoustic score: green good, amber so-so, red weak. */
+function letterColor(score: number): string {
+  if (score >= 0.7) return '#1a7f37';
+  if (score >= 0.4) return '#b8860b';
+  return 'var(--accent)';
+}
+
+function verdict(percent: number): string {
+  if (percent >= 75) return 'Отлично';
+  if (percent >= 55) return 'Неплохо';
+  return 'Ещё раз';
+}
 
 export default function SpeechCheck() {
   const [idx, setIdx] = useState(0);
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false); // stop -> recognize -> score window
   const [asrStatus, setAsrStatus] = useState<AsrStatus | null>(null);
-  const [heard, setHeard] = useState<string | null>(null);
-  const [score, setScore] = useState<Score | null>(null);
+  const [result, setResult] = useState<Analysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<Recorder | null>(null);
 
@@ -42,8 +50,7 @@ export default function SpeechCheck() {
   const busy = processing;
 
   function reset() {
-    setHeard(null);
-    setScore(null);
+    setResult(null);
     setError(null);
     setAsrStatus(null);
   }
@@ -67,9 +74,7 @@ export default function SpeechCheck() {
     setProcessing(true); // guard the stop -> recognize -> score window (mic still settling)
     try {
       const wave = await rec.stop();
-      const text = await recognize(wave, setAsrStatus);
-      setHeard(text);
-      setScore(scorePronunciation(phrase.ky, text));
+      setResult(await analyze(wave, phrase.ky, setAsrStatus));
     } catch {
       setError('Не удалось распознать. Попробуйте ещё раз.');
     } finally {
@@ -134,35 +139,30 @@ export default function SpeechCheck() {
         </div>
       )}
 
-      {score && heard !== null && (
+      {result && (
         <div style={{ marginTop: '1.1rem' }}>
-          <div style={{ fontSize: '2rem', fontWeight: 700, color: score.percent >= 70 ? '#1a7f37' : 'var(--accent)' }}>
-            {score.percent}%
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
+            <span style={{ fontSize: '2rem', fontWeight: 700, color: letterColor(result.percent / 100) }}>
+              {result.percent}%
+            </span>
+            <span className="study-meta">{verdict(result.percent)} · произношение по звукам</span>
           </div>
+
+          <div style={{ fontSize: '1.7rem', letterSpacing: '0.02em', margin: '0.6rem 0' }}>
+            {result.letters.map((l, i) =>
+              l.gap ? (
+                <span key={i}>&nbsp;&nbsp;</span>
+              ) : (
+                <span key={i} title={`${Math.round(l.score * 100)}%`} style={{ color: letterColor(l.score) }}>
+                  {l.ch}
+                </span>
+              ),
+            )}
+          </div>
+
           <div className="study-meta">
-            Услышано: <b style={{ color: 'var(--text)' }}>{heard || '—'}</b>
+            Услышано (открытое распознавание): <b style={{ color: 'var(--text)' }}>{result.transcript || '—'}</b>
           </div>
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
-            {score.words.map((w, i) => (
-              <span
-                key={i}
-                title={w.status === 'wrong' ? `услышано: ${w.heard}` : w.status === 'missing' ? 'не распознано' : ''}
-                style={{
-                  padding: '0.2rem 0.55rem',
-                  borderRadius: '6px',
-                  border: `1px solid ${STATUS_COLOR[w.status]}`,
-                  color: STATUS_COLOR[w.status],
-                  fontSize: '0.95rem',
-                }}
-              >
-                {w.target}
-                {w.status === 'wrong' ? ` → ${w.heard}` : ''}
-              </span>
-            ))}
-          </div>
-          {score.extra.length > 0 && (
-            <div className="study-meta" style={{ marginTop: '0.5rem' }}>Лишнее: {score.extra.join(', ')}</div>
-          )}
         </div>
       )}
     </div>
