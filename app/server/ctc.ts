@@ -1,5 +1,5 @@
 // Pure CTC helpers — no runtime dependencies, unit-tested against the reference fixture
-// (web/scripts/ctc-fixture.json, exported from the original Python pipeline). main.ts wires
+// (scripts/ctc-fixture.json, exported from the original Python pipeline). main.ts wires
 // these to onnxruntime-node output.
 
 /** Row-wise softmax over the vocab dimension of a [frames, vocab] logits buffer. */

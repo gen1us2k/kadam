@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.astro/
+
+# Large ONNX model weights (ASR + TTS) — gitignored (>100 MB). Regenerate the ASR model with
+# scripts/export-asr.py; get the TTS model from HuggingFace (see README).
+models/**/*.onnx

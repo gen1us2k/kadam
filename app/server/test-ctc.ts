@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs';
 import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
 
-const fx = JSON.parse(readFileSync(new URL('../web/scripts/ctc-fixture.json', import.meta.url), 'utf8'));
+const fx = JSON.parse(readFileSync(new URL('../scripts/ctc-fixture.json', import.meta.url), 'utf8'));
 const { frames, vocab, logits, vocabMap, blank, delimiter, targetIds, expectedGreedy, expectedGop, expectedPercent } = fx;
 
 let fail = 0;

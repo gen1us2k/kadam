@@ -41,7 +41,7 @@ check('clip -1 -> -32768', buf.readInt16LE(44 + 4 * 2) === -0x8000);
 
 // --- sanity against the real tokens.txt (if present) ---
 try {
-  const real = parseTokens(readFileSync(new URL('./models/tts/tokens.txt', import.meta.url), 'utf8'));
+  const real = parseTokens(readFileSync(new URL('../models/tts/tokens.txt', import.meta.url), 'utf8'));
   check('real tokens has space', real.get(' ') !== undefined);
   check('real tokens covers кыргыз', ['к', 'ы', 'р', 'г', 'з'].every((c) => real.get(c) !== undefined));
 } catch {

@@ -1,12 +1,11 @@
-// Kyrgyz ASR + pronunciation-scoring backend (TypeScript, same stack as the web app).
+// Kyrgyz backend: ASR + pronunciation scoring, TTS synthesis, and serving the built site.
 //
-// Moves the ~338 MB wav2vec2 ONNX model out of the browser: the web app records audio, uploads a
-// small 16 kHz mono WAV (~64 KB per phrase) as a raw POST body, and gets back the same Analysis
-// JSON the in-browser pipeline produced — {transcript, percent, letters}. CTC math lives in
-// ctc.ts, locked to the reference fixture by test-ctc.ts.
+// One port serves the app (dist/) and the API. Audio is uploaded as a small WAV (ASR) or
+// requested by text (TTS); the ~338 MB ASR and ~114 MB TTS ONNX models run here, not in the
+// browser. CTC math lives in ctc.ts, locked to the reference fixture by test-ctc.ts.
 //
-// Run (from server/):  npm install && npm start          # listens on :8000
-// Model files come from server/models/ — regenerate with web/scripts/export-asr.py.
+// Run (from app/):  npm install && npm run serve      # builds dist, listens on :8000
+// Model files come from app/models/ — ASR: scripts/export-asr.py; TTS: models/tts/ (see README).
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { createReadStream } from 'node:fs';
@@ -18,10 +17,10 @@ import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
 import { CONTENT_TYPES, cacheControl, resolveStatic, weakEtag } from './static.ts';
 import { parseTokens, tokenize, encodeWav } from './tts.ts';
 
-const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('./models', import.meta.url));
-// The built web app (astro build -> web/dist) is served from the same port as /api.
-const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL('../web/dist', import.meta.url));
-const PORT = Number(process.env.PORT ?? 8000);
+const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('../models', import.meta.url));
+// The built app (astro build -> dist) is served from the same port as /api.
+const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL('../dist', import.meta.url));
+const PORT = Number(process.env.PORT ?? 4321);
 const SAMPLE_RATE = 16000;
 const MAX_SECONDS = 30;
 const MAX_BODY = 44 + MAX_SECONDS * SAMPLE_RATE * 2; // WAV header + 30 s of 16-bit samples
@@ -54,7 +53,7 @@ async function loadModels() {
     };
   } catch (e) {
     throw new Error(
-      `model files not found/loadable in ${MODELS_DIR} — ASR: web/scripts/export-asr.py; TTS: models/tts/{model.onnx,tokens.txt}`,
+      `model files not found/loadable in ${MODELS_DIR} — ASR: scripts/export-asr.py; TTS: models/tts/{model.onnx,tokens.txt}`,
       { cause: e },
     );
   }
@@ -166,7 +165,7 @@ async function synthesizeTts(text: string): Promise<Buffer> {
   return encodeWav(wave, SAMPLE_RATE);
 }
 
-/** Serve a built static asset from web/dist. Streamed so large JS bundles don't buffer in memory. */
+/** Serve a built static asset from dist/. Streamed so large JS bundles don't buffer in memory. */
 async function serveStatic(pathname: string, req: IncomingMessage, res: ServerResponse): Promise<void> {
   const file = resolveStatic(STATIC_DIR, pathname);
   if (!file) {
@@ -263,4 +262,4 @@ try {
   console.warn(`[warn] ${STATIC_DIR}/index.html not found — run \`cd web && npm run build\` to serve the app`);
 }
 
-server.listen(PORT, () => console.log(`kyrgyz app on http://localhost:${PORT}  (api + web/dist, models: ${MODELS_DIR})`));
+server.listen(PORT, () => console.log(`kyrgyz app on http://localhost:${PORT}  (api + dist, models: ${MODELS_DIR})`));

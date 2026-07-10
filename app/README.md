@@ -99,10 +99,10 @@ onnxruntime-node. Браузер (`lib/tts.ts`) просто дёргает `GET
 Кнопки — в карточках, дриллах, читалке и словаре. Google TTS не поддерживает кыргызский
 (проверено, 400), Forvo не встраивается без платного API — отсюда собственный MMS.
 
-Модель (`server/models/tts/model.onnx` + `tokens.txt`, ~114 МБ) гитигнорена. Источник —
+Модель (`models/tts/model.onnx` + `tokens.txt`, ~114 МБ) гитигнорена. Источник —
 willwade/mms-tts-multilingual-models-onnx (папка `kir`) на HuggingFace; положить оба файла в
-`server/models/tts/`. После переноса TTS браузер вообще не тянет `onnxruntime-web` (ASR тоже на
-бэкенде) — из `web/dist` ушли и модель, и ORT-wasm.
+`models/tts/`. После переноса TTS браузер вообще не тянет `onnxruntime-web` (ASR тоже на
+бэкенде) — из `dist` ушли и модель, и ORT-wasm.
 
 ## Распознавание речи + проверка произношения (PoC)
 
@@ -119,21 +119,20 @@ node:http + onnxruntime-node, iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8)
 транскрипта. CTC-математика — `server/ctc.ts`, залочена на эталонную фикстуру
 (`scripts/ctc-fixture.json` ↔ `server/test-ctc.ts`).
 
-Запуск (одно приложение, один порт): собрать сайт и поднять сервер — он раздаёт и статику
-`web/dist`, и `/api` с одного порта (8000, Node ≥23):
+Фронтенд (`src/`, Astro) и бэкенд (`server/`, node:http + onnxruntime-node) — **один проект**
+с одним `package.json`. Запуск (один порт 4321, Node ≥23):
 
 ```
-cd web && npm install && npm run build
-cd ../server && npm install && npm start   # http://localhost:8000 — сайт + API
-# или одной командой из server/: npm run serve  (собирает web, затем стартует)
+npm install
+npm run serve        # собирает dist и стартует сервер: http://localhost:4321 — сайт + API
 ```
 
-Для разработки удобнее `cd web && npm run dev` (:4321 с HMR) — он проксирует `/api` на :8000
-(см. `astro.config.mjs`), так что сервер тоже должен быть запущен. Веса модели гитигнорены
-(>100 МБ); регенерация:
+Для разработки — `npm run dev` (:4322 с HMR); он проксирует `/api` на сервер :4321, так что
+сервер (`npm start`) тоже должен быть запущен. `npm test` гоняет серверные (ctc/static/tts) и клиентские
+проверки; `npm run typecheck` — оба tsconfig. Веса модели гитигнорены (>100 МБ); регенерация ASR:
 
 ```
-cd web && python3 -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
-python scripts/export-asr.py   # пишет server/models/{model.onnx, vocab.json, asr-meta.json}
+python scripts/export-asr.py   # пишет models/{model.onnx, vocab.json, asr-meta.json}
 ```

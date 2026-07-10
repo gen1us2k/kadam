@@ -1,0 +1,28 @@
+{
+  "name": "kyrgyz-app",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "start": "node server/main.ts",
+    "serve": "npm run build && npm start",
+    "test": "node server/test-ctc.ts && node server/test-static.ts && node server/test-tts.ts && node scripts/test-audio.ts",
+    "typecheck": "tsc --noEmit && tsc -p server/tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/react": "^6.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^5.13.0",
+    "marked": "^18.0.5",
+    "onnxruntime-node": "^1.19.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}
