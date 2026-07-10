@@ -14,8 +14,6 @@ const PHRASES = [
 ];
 
 const ASR_LABEL: Record<AsrStatus, string> = {
-  downloading: 'загрузка модели… (~338 МБ, один раз)',
-  loading: 'запуск…',
   recognizing: 'распознаю…',
   done: '',
   error: 'ошибка распознавания',

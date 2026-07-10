@@ -106,25 +106,24 @@ X нед.». Прогресс шагов слов/корпуса считает�
 
 ## Распознавание речи + проверка произношения (PoC)
 
-Страница `/poc-speech` — прототип: запись с микрофона, распознавание кыргызской речи **в
-браузере** (iarfmoose/wav2vec2-large-xlsr-kyrgyz, экспорт в ONNX int8, через onnxruntime-web —
-`lib/asr.ts`, `lib/audio.ts`). Оценка произношения — по **CTC forced alignment** к целевой
-фразе: раз фраза известна, аудио выравнивается (Viterbi) на ожидаемые звуки, и для каждой буквы
-берётся её акустическая уверенность (Goodness-of-Pronunciation) → % + подсветка по буквам. Это
-устойчивее нечёткого сравнения транскрипта — держится, даже если открытый декод роняет край
-слова. Чистая CTC-математика — в `lib/ctc.ts` (проверена паритетом с Python). Вход чистится:
-mono + noiseSuppression/AGC на микрофоне и обрезка тишины по краям. Полностью клиентское, аудио
-никуда не уходит.
+Страница `/poc-speech` — прототип: запись с микрофона, распознавание кыргызской речи и оценка
+произношения. Распознавание работает **на бэкенде** (`server/`, FastAPI + onnxruntime,
+iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8): браузер записывает голос, чистит вход (mono +
+noiseSuppression/AGC, обрезка тишины — `lib/audio.ts`) и шлёт маленький 16-кГц WAV (~64 КБ на
+фразу) — модель (~338 МБ) в браузер больше не грузится.
 
-Веса модели (~338 МБ) **не в репозитории** (`.gitignore` → `public/**/model.onnx`, >100 МБ).
-После свежего чекаута `/poc-speech` не заработает, пока модель не сгенерирована:
+Оценка — по **CTC forced alignment** к целевой фразе: раз фраза известна, аудио выравнивается
+(Viterbi) на ожидаемые звуки, и для каждой буквы берётся её акустическая уверенность
+(Goodness-of-Pronunciation) → % + подсветка по буквам. Устойчивее нечёткого сравнения
+транскрипта. CTC-математика — `server/ctc.py`, залочена на эталонную фикстуру
+(`scripts/ctc-fixture.json` ↔ `server/test_ctc.py`).
+
+Запуск: `cd server && pip install -r requirements.txt && uvicorn main:app --port 8000`;
+dev-сервер Astro проксирует `/api` на :8000 (см. `astro.config.mjs`). Веса модели гитигнорены
+(>100 МБ); регенерация:
 
 ```
 cd web && python3 -m venv .venv && source .venv/bin/activate
 pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
-python scripts/export-asr.py   # пишет public/asr/{model.onnx, vocab.json, asr-meta.json}
+python scripts/export-asr.py   # пишет server/models/{model.onnx, vocab.json, asr-meta.json}
 ```
-
-Метаданные декодера (`vocab.json`, `asr-meta.json`) — маленькие, закоммичены; регенерируются тем
-же скриптом. Квантование **только MatMul**: динамический int8 conv-слоёв даёт `ConvInteger`,
-не поддержанный wasm-бэкендом ORT (та же стена, что у TTS).

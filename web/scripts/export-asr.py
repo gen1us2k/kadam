@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export iarfmoose/wav2vec2-large-xlsr-kyrgyz (Wav2Vec2ForCTC) to ONNX int8 for the browser PoC.
+"""Export iarfmoose/wav2vec2-large-xlsr-kyrgyz (Wav2Vec2ForCTC) to ONNX int8 for the ASR backend.
 
 The model weights are gitignored (~338 MB > GitHub's 100 MB limit), so regenerate them here.
 
@@ -7,10 +7,11 @@ The model weights are gitignored (~338 MB > GitHub's 100 MB limit), so regenerat
     pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
     python scripts/export-asr.py
 
-Writes public/asr/{model.onnx, vocab.json, asr-meta.json}. The runtime side lives in
-src/lib/asr.ts. NOTE: quantize MatMul ONLY — dynamic-quantizing the conv feature extractor
-emits ConvInteger, which onnxruntime-web's wasm backend does not implement (same wall the TTS
-model hit). Convs stay fp32; the transformer MatMuls hold most of the weight anyway.
+Writes server/models/{model.onnx, vocab.json, asr-meta.json} — consumed by server/main.py
+(the browser no longer loads the model; see web/src/lib/asr.ts). NOTE: quantize MatMul ONLY —
+dynamic-quantizing the conv feature extractor emits ConvInteger, which onnxruntime-web's wasm
+backend does not implement (kept for potential in-browser fallback; convs stay fp32 and the
+transformer MatMuls hold most of the weight anyway).
 """
 import json
 import os
@@ -21,7 +22,7 @@ from onnxruntime.quantization import QuantType, quantize_dynamic
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
 MODEL = "iarfmoose/wav2vec2-large-xlsr-kyrgyz"
-OUT = os.path.join(os.path.dirname(__file__), "..", "public", "asr")
+OUT = os.path.join(os.path.dirname(__file__), "..", "..", "server", "models")
 FP32 = os.path.join(OUT, "model.fp32.onnx")
 INT8 = os.path.join(OUT, "model.onnx")
 
