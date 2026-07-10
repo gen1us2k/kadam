@@ -2,7 +2,7 @@
 import Base from '../layouts/Base.astro';
 import Journey from '../components/Journey.tsx';
 import DailyBanner from '../components/DailyBanner.tsx';
-import { getCollection } from 'astro:content';
+import { getCollection, getEntry } from 'astro:content';
 import { loadVocab } from '../lib/vocab';
 import { splitLessons } from '../lib/lessons';
 import { buildJourney } from '../lib/journey';
@@ -22,7 +22,12 @@ const weeks = entries.map((entry) => ({
   slug: entry.id.split('/')[0],
   lessons: splitLessons(entry.body ?? '').map((l) => ({ title: l.title, html: renderMd(l.markdown) })),
 }));
-const steps = buildJourney(weeks, deck);
+// Survival phrases become an in-path station in week 1 (source stays ../phrases.md).
+const phrasesEntry = await getEntry('docs', 'phrases');
+const phrasesHtml = phrasesEntry
+  ? renderMd((phrasesEntry.body ?? '').replace(/^#[^\n]*\n/, ''))
+  : undefined;
+const steps = buildJourney(weeks, deck, { phrasesHtml });
 ---
 
 <Base title="Кыргызча 80/20 — путь изучения" active="/">

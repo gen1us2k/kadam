@@ -20,10 +20,24 @@ export default function DailyBanner({ deck }: { deck: DeckCard[] }) {
 
   if (!line) return null;
 
+  // Primary action: jump to the current journey step on this same page.
+  function continuePath() {
+    const current = document.querySelector('.jstep.current');
+    if (current) {
+      current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      (current.querySelector('.jstep-head') as HTMLButtonElement | null)?.click();
+    } else {
+      window.location.href = '/study';
+    }
+  }
+
   return (
     <div className="home-status">
       <div><strong>{done ? '✓ Дневная цель выполнена' : 'Дневная сессия'}</strong> <span className="study-meta">{line}</span></div>
-      <a className="btn" href="/study">{done ? 'Ещё повторить' : 'Начать'}</a>
+      <div className="home-status-actions">
+        <button className="btn" onClick={continuePath}>Продолжить путь</button>
+        <a className="btn ghost" href="/study">Сессия</a>
+      </div>
     </div>
   );
 }

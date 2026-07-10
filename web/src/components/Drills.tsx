@@ -12,8 +12,8 @@ function daySeed(): number {
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 
-export default function Drills({ count = 6 }: { count?: number }) {
-  const drills = useMemo(() => buildDrills(count, daySeed()), [count]);
+export default function Drills({ count = 6, types }: { count?: number; types?: string[] }) {
+  const drills = useMemo(() => buildDrills(count, daySeed(), types), [count, types]);
   const [index, setIndex] = useState(0);
   const [value, setValue] = useState('');
   const [answered, setAnswered] = useState<null | boolean>(null);

@@ -86,8 +86,16 @@ export const DRILL_NOUNS = [
   'нан', 'эт', 'токой', 'айыл', 'көчө', 'дүкөн', 'терезе', 'эшик', 'калем', 'гүл',
 ];
 
-/** Deterministic pseudo-random drill set for a given seed (e.g. day number). */
-export function buildDrills(count: number, seed: number): Drill[] {
+/** Task names accepted by the `tasks` filter of buildDrills. */
+export const DRILL_TASKS = DRILL_TYPES.map((t) => t.task);
+
+/**
+ * Deterministic pseudo-random drill set for a given seed (e.g. day number).
+ * Optional `tasks` restricts drill types (e.g. only plural for early journey steps).
+ */
+export function buildDrills(count: number, seed: number, tasks?: string[]): Drill[] {
+  const types = tasks ? DRILL_TYPES.filter((t) => tasks.includes(t.task)) : DRILL_TYPES;
+  if (types.length === 0) return [];
   const drills: Drill[] = [];
   let x = seed || 1;
   const next = () => {
@@ -96,9 +104,9 @@ export function buildDrills(count: number, seed: number): Drill[] {
     return Math.abs(x);
   };
   const used = new Set<string>();
-  while (drills.length < count && used.size < DRILL_NOUNS.length * DRILL_TYPES.length) {
+  while (drills.length < count && used.size < DRILL_NOUNS.length * types.length) {
     const noun = DRILL_NOUNS[next() % DRILL_NOUNS.length];
-    const type = DRILL_TYPES[next() % DRILL_TYPES.length];
+    const type = types[next() % types.length];
     const key = `${noun}|${type.task}`;
     if (used.has(key)) continue;
     used.add(key);

@@ -381,6 +381,10 @@ tr[hidden] { display: none; }
 .jstep.vocab { border-left-color: #2f8f4e; }
 .jstep.review { border-left-color: var(--accent); }
 .jstep.corpus { border-left-color: #c98a1a; }
+.jstep.drill { border-left-color: #8e44ad; }
+.jstep.reader { border-left-color: #2980b9; }
+.jstep.phrases { border-left-color: #16a085; }
+.home-status-actions { display: flex; gap: 0.5rem; align-items: center; }
 .jstep.current { box-shadow: 0 0 0 2px var(--accent-soft); }
 .jstep.open { border-color: var(--accent); }
 .jstep.done .jstep-title { text-decoration: line-through; color: var(--muted); }

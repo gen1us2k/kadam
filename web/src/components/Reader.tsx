@@ -4,6 +4,10 @@ import SpeakButton from './SpeakButton';
 
 interface Props {
   deck: DeckCard[];
+  /** Pre-filled text (e.g. a graded journey text). */
+  initialText?: string;
+  /** Skip the textarea and show the parsed text immediately. */
+  autoParse?: boolean;
 }
 
 const SAMPLE =
@@ -13,9 +17,9 @@ const SAMPLE =
 const cleanToken = (raw: string) => raw.replace(/[.,!?;:«»()\d]/g, '');
 
 /** Graded-reading helper: click a word, see dictionary matches (exact, then longest stem). */
-export default function Reader({ deck }: Props) {
-  const [text, setText] = useState(SAMPLE);
-  const [parsed, setParsed] = useState<string[] | null>(null);
+export default function Reader({ deck, initialText, autoParse = false }: Props) {
+  const [text, setText] = useState(initialText ?? SAMPLE);
+  const [parsed, setParsed] = useState<string[] | null>(autoParse ? (initialText ?? SAMPLE).split(/(\s+)/) : null);
   const [selected, setSelected] = useState<string | null>(null);
 
   const byExact = useMemo(() => {
