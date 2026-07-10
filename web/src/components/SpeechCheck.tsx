@@ -21,10 +21,20 @@ const ASR_LABEL: Record<AsrStatus, string> = {
   error: 'ошибка распознавания',
 };
 
+const GREEN = '#1a7f37';
+const AMBER = '#b8860b';
+
 /** Color a per-letter acoustic score: green good, amber so-so, red weak. */
 function letterColor(score: number): string {
-  if (score >= 0.7) return '#1a7f37';
-  if (score >= 0.4) return '#b8860b';
+  if (score >= 0.7) return GREEN;
+  if (score >= 0.4) return AMBER;
+  return 'var(--accent)';
+}
+
+/** Headline color — same bands as the verdict text so they never disagree. */
+function percentColor(percent: number): string {
+  if (percent >= 75) return GREEN;
+  if (percent >= 55) return AMBER;
   return 'var(--accent)';
 }
 
@@ -142,7 +152,7 @@ export default function SpeechCheck() {
       {result && (
         <div style={{ marginTop: '1.1rem' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem' }}>
-            <span style={{ fontSize: '2rem', fontWeight: 700, color: letterColor(result.percent / 100) }}>
+            <span style={{ fontSize: '2rem', fontWeight: 700, color: percentColor(result.percent) }}>
               {result.percent}%
             </span>
             <span className="study-meta">{verdict(result.percent)} · произношение по звукам</span>

@@ -98,7 +98,8 @@ async function decodeTo16kMono(bytes: ArrayBuffer): Promise<Float32Array> {
     await tmp.close();
   }
 
-  const frames = Math.round((decoded.duration * TARGET_RATE));
+  const frames = Math.round(decoded.duration * TARGET_RATE);
+  if (frames < 1) throw new Error('recording too short'); // OfflineAudioContext rejects length 0
   const offline = new OfflineAudioContext(1, frames, TARGET_RATE);
   const src = offline.createBufferSource();
   src.buffer = decoded;

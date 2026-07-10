@@ -40,7 +40,11 @@ export function greedyDecode(
         best = v;
       }
     }
-    if (best !== prev && best !== blank) tokens.push(idToToken.get(best) ?? '');
+    if (best !== prev && best !== blank) {
+      const tok = idToToken.get(best) ?? '';
+      // Skip special tokens ([UNK], [PAD], <s>, </s>) so they don't leak into the transcript.
+      if (tok && tok[0] !== '[' && tok[0] !== '<') tokens.push(tok);
+    }
     prev = best;
   }
   return tokens.join('').split(delimiter).join(' ').replace(/\s+/g, ' ').trim();
