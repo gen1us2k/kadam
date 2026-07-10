@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adaptiveNewLimit, deckStats, loadStore } from '../lib/srs';
 import type { DeckCard } from '../lib/srs';
-import { loadDaily } from '../lib/daily';
+import { loadDaily, recordRetained } from '../lib/daily';
 
 interface Plan {
   due: number;
@@ -20,6 +20,7 @@ export default function DailyBanner({ deck }: { deck: DeckCard[] }) {
   useEffect(() => {
     const daily = loadDaily();
     const st = deckStats(deck, loadStore(), Date.now());
+    recordRetained(st.retained); // snapshot feeds the pace forecast
     const newCount = Math.min(st.fresh, adaptiveNewLimit(st.due));
     setPlan({
       due: st.due,

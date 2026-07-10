@@ -3,6 +3,9 @@
 // queue building (interleaved daily mix) and deck statistics.
 
 import { fsrsInit, fsrsReview, fsrsInterval, retrievability } from './fsrs';
+import type { Grade } from './fsrs';
+
+export type { Grade } from './fsrs';
 
 export interface CardState {
   /** FSRS stability (days). */
@@ -67,26 +70,31 @@ export function cardId(card: Pick<DeckCard, 'kg' | 'ru'>): string {
 }
 
 /**
- * Grade a card with a binary answer. Correct schedules via FSRS; wrong updates the FSRS
- * state (lapse) and re-queues the card in ~10 minutes (relearning step).
+ * Grade a card with a full FSRS grade. Again (1) lapses and re-queues the card in ~10
+ * minutes (relearning step); Hard/Good/Easy (2..4) schedule via FSRS.
  */
-export function grade(prev: CardState | undefined, correct: boolean, now: number): CardState {
+export function gradeAnswer(prev: CardState | undefined, g: Grade, now: number): CardState {
   if (!prev) {
-    const st = fsrsInit(correct);
-    const due = correct ? now + fsrsInterval(st.s) * DAY : now + RELEARN_MS;
-    return { s: st.s, d: st.d, due, last: now, reps: 1, lapses: correct ? 0 : 1 };
+    const st = fsrsInit(g);
+    const due = g === 1 ? now + RELEARN_MS : now + fsrsInterval(st.s) * DAY;
+    return { s: st.s, d: st.d, due, last: now, reps: 1, lapses: g === 1 ? 1 : 0 };
   }
   const elapsedDays = Math.max(0, (now - prev.last) / DAY);
-  const st = fsrsReview({ s: prev.s, d: prev.d }, correct, elapsedDays);
-  const due = correct ? now + fsrsInterval(st.s) * DAY : now + RELEARN_MS;
+  const st = fsrsReview({ s: prev.s, d: prev.d }, g, elapsedDays);
+  const due = g === 1 ? now + RELEARN_MS : now + fsrsInterval(st.s) * DAY;
   return {
     s: st.s,
     d: st.d,
     due,
     last: now,
     reps: prev.reps + 1,
-    lapses: prev.lapses + (correct ? 0 : 1),
+    lapses: prev.lapses + (g === 1 ? 1 : 0),
   };
+}
+
+/** Binary convenience wrapper: correct → Good, wrong → Again. */
+export function grade(prev: CardState | undefined, correct: boolean, now: number): CardState {
+  return gradeAnswer(prev, correct ? 3 : 1, now);
 }
 
 /** A card is due if it has never been seen or its scheduled time has passed. */
@@ -111,6 +119,8 @@ export interface QueueOptions {
   newLimit?: number;
   /** Hard cap on total session length. */
   max?: number;
+  /** Card ids to introduce first (e.g. words the user picked in the reader). */
+  priority?: string[];
 }
 
 /**
@@ -130,8 +140,14 @@ export function buildQueue(deck: DeckCard[], store: Store, now: number, opts: Qu
   // Adaptive throttle applies to the global mixed session; a tag-scoped station (deliberate
   // study of one step) keeps the flat base limit so it always introduces new words.
   const newLimit = opts.newLimit ?? (opts.tag ? BASE_NEW : adaptiveNewLimit(due.length));
-  // Verified-first: introduce trusted (curated / verified) words before model-generated ones.
-  const orderedFresh = [...fresh].sort((a, b) => Number(isUnverified(a)) - Number(isUnverified(b)));
+  // Order of introduction: user-picked (reader) words first, then trusted (curated/verified)
+  // words before model-generated ones.
+  const prio = new Set(opts.priority ?? []);
+  const orderedFresh = [...fresh].sort(
+    (a, b) =>
+      Number(prio.has(cardId(b))) - Number(prio.has(cardId(a))) ||
+      Number(isUnverified(a)) - Number(isUnverified(b)),
+  );
   const queue = shuffle([...due, ...orderedFresh.slice(0, newLimit)]);
   return opts.max ? queue.slice(0, opts.max) : queue;
 }
@@ -239,4 +255,39 @@ export function saveStore(store: Store): void {
   } catch {
     // Quota or private-mode failure — non-fatal for a study aid.
   }
+}
+
+// --- Learn-next list: words hand-picked (e.g. in the reader) to introduce first. ---
+
+const LEARN_KEY = 'kyrgyz-learn-v1';
+
+export function loadLearnList(): string[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LEARN_KEY);
+    const list = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLearnList(list: string[]): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(LEARN_KEY, JSON.stringify(list));
+  } catch {
+    // non-fatal
+  }
+}
+
+export function addToLearn(id: string): void {
+  const list = loadLearnList();
+  if (!list.includes(id)) saveLearnList([...list, id]);
+}
+
+/** Drop an id once the card has been studied (its state now drives scheduling). */
+export function removeFromLearn(id: string): void {
+  const list = loadLearnList();
+  if (list.includes(id)) saveLearnList(list.filter((x) => x !== id));
 }

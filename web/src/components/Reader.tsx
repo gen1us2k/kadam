@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { addToLearn, cardId, loadLearnList, loadStore } from '../lib/srs';
 import type { DeckCard } from '../lib/srs';
 import SpeakButton from './SpeakButton';
 
@@ -21,6 +22,16 @@ export default function Reader({ deck, initialText, autoParse = false }: Props) 
   const [text, setText] = useState(initialText ?? SAMPLE);
   const [parsed, setParsed] = useState<string[] | null>(autoParse ? (initialText ?? SAMPLE).split(/(\s+)/) : null);
   const [selected, setSelected] = useState<string | null>(null);
+  // Queued/studied sets to close the reading → SRS loop. Read lazily on the client;
+  // the lookup panel only renders after a click, so there is no hydration mismatch.
+  const [queued, setQueued] = useState<Set<string>>(() => new Set(loadLearnList()));
+  const studied = useMemo(() => new Set(Object.keys(loadStore())), []);
+
+  function queueWord(card: DeckCard) {
+    const id = cardId(card);
+    addToLearn(id);
+    setQueued((q) => new Set(q).add(id));
+  }
 
   const byExact = useMemo(() => {
     const m = new Map<string, DeckCard[]>();
@@ -87,12 +98,23 @@ export default function Reader({ deck, initialText, autoParse = false }: Props) 
             <div className="reader-panel">
               <strong>{selected}</strong> <SpeakButton text={selected} />
               {matches.length === 0 && <p className="study-meta">Нет в словаре курса. Возможно, это форма незнакомого слова.</p>}
-              {matches.map((m) => (
-                <p key={`${m.kg}|${m.ru}`}>
-                  <b>{m.kg}</b> — {m.ru}
-                  {m.example && <span className="study-meta"> · {m.example}</span>}
-                </p>
-              ))}
+              {matches.map((m) => {
+                const id = cardId(m);
+                return (
+                  <p key={id}>
+                    <b>{m.kg}</b> — {m.ru}
+                    {m.example && <span className="study-meta"> · {m.example}</span>}
+                    {' '}
+                    {studied.has(id) ? (
+                      <span className="study-meta">· изучается</span>
+                    ) : queued.has(id) ? (
+                      <span className="study-meta">· ✓ будет в следующей сессии</span>
+                    ) : (
+                      <button className="btn ghost queue-btn" onClick={() => queueWord(m)}>→ в повторение</button>
+                    )}
+                  </p>
+                );
+              })}
             </div>
           )}
 

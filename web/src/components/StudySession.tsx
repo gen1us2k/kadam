@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildQueue, cardId, deckStats, grade, isUnverified, loadStore, saveStore } from '../lib/srs';
-import type { DeckCard, Store } from '../lib/srs';
+import {
+  buildQueue, cardId, deckStats, gradeAnswer, isUnverified,
+  loadLearnList, loadStore, removeFromLearn, saveStore,
+} from '../lib/srs';
+import type { CardState, DeckCard, Grade, Store } from '../lib/srs';
 import { loadDaily, recordAnswer } from '../lib/daily';
 import type { DailyState } from '../lib/daily';
 import SpeakButton from './SpeakButton';
@@ -68,7 +71,7 @@ export default function StudySession({ deck, tag }: Props) {
   const storeRef = useRef<Store>({});
   const [queue, setQueue] = useState<DeckCard[]>([]);
   const [index, setIndex] = useState(0);
-  const [answered, setAnswered] = useState<null | { correct: boolean; picked?: string }>(null);
+  const [answered, setAnswered] = useState<null | { correct: boolean; picked?: string; prev?: CardState }>(null);
   const [typedValue, setTypedValue] = useState('');
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [daily, setDaily] = useState<DailyState | null>(null);
@@ -77,7 +80,7 @@ export default function StudySession({ deck, tag }: Props) {
   useEffect(() => {
     const store = loadStore();
     storeRef.current = store;
-    setQueue(buildQueue(deck, store, Date.now(), { tag }));
+    setQueue(buildQueue(deck, store, Date.now(), { tag, priority: loadLearnList() }));
     setDaily(loadDaily());
     setReady(true);
   }, [deck, tag]);
@@ -99,11 +102,23 @@ export default function StudySession({ deck, tag }: Props) {
   function commit(correct: boolean, picked?: string) {
     if (answered || !card) return;
     const store = storeRef.current;
-    store[cardId(card)] = grade(store[cardId(card)], correct, Date.now());
+    const id = cardId(card);
+    const prev = store[id];
+    store[id] = gradeAnswer(prev, correct ? 3 : 1, Date.now());
     saveStore(store);
+    removeFromLearn(id); // studied now — no longer needs hand-picked priority
     setDaily(recordAnswer());
     setScore((s) => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }));
-    setAnswered({ correct, picked });
+    setAnswered({ correct, picked, prev });
+  }
+
+  /** Optional post-answer refinement: replace the auto-applied Good with Hard/Easy, then advance. */
+  function regradeAndNext(g: Grade) {
+    if (!answered || !card) return;
+    const store = storeRef.current;
+    store[cardId(card)] = gradeAnswer(answered.prev, g, Date.now());
+    saveStore(store);
+    next();
   }
 
   function submitTyped() {
@@ -119,7 +134,7 @@ export default function StudySession({ deck, tag }: Props) {
   }
 
   function restart() {
-    setQueue(buildQueue(deck, storeRef.current, Date.now(), { tag }));
+    setQueue(buildQueue(deck, storeRef.current, Date.now(), { tag, priority: loadLearnList() }));
     setIndex(0);
     setAnswered(null);
     setTypedValue('');
@@ -254,9 +269,21 @@ export default function StudySession({ deck, tag }: Props) {
       <div className="study-footer">
         <div className="study-meta">Счёт: {score.correct} / {score.total}{dailyLine ? ` · ${dailyLine}` : ''}</div>
         {answered && (
-          <button className="btn" onClick={next}>
-            {index + 1 < queue.length ? 'Далее' : 'Завершить'}
-          </button>
+          <div className="grade-btns">
+            {answered.correct && (
+              <button className="btn ghost" onClick={() => regradeAndNext(2)} title="Вспомнил с трудом — показать раньше">
+                Тяжело
+              </button>
+            )}
+            <button className="btn" onClick={next}>
+              {index + 1 < queue.length ? 'Далее' : 'Завершить'}
+            </button>
+            {answered.correct && (
+              <button className="btn ghost" onClick={() => regradeAndNext(4)} title="Слишком легко — показать намного позже">
+                Легко
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

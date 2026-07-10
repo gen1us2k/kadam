@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildDrills } from '../lib/morphology';
 import { daySeed, recordAnswer } from '../lib/daily';
 import SpeakButton from './SpeakButton';
@@ -6,13 +6,26 @@ import SpeakButton from './SpeakButton';
 const KG_LETTERS = ['ң', 'ө', 'ү'];
 const norm = (s: string) => s.toLowerCase().trim();
 
-export default function Drills({ count = 6, types }: { count?: number; types?: string[] }) {
+interface Props {
+  count?: number;
+  types?: string[];
+  /** Fired once when the set is finished (e.g. to mark a journey station done). */
+  onComplete?: () => void;
+}
+
+export default function Drills({ count = 6, types, onComplete }: Props) {
   const drills = useMemo(() => buildDrills(count, daySeed(), types), [count, types]);
   const [index, setIndex] = useState(0);
   const [value, setValue] = useState('');
   const [answered, setAnswered] = useState<null | boolean>(null);
   const [score, setScore] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const finished = drills.length > 0 && index >= drills.length;
+  useEffect(() => {
+    if (finished) onComplete?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on completion
+  }, [finished]);
 
   const drill = drills[index];
 

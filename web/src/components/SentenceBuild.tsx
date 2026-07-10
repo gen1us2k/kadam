@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { pickSentences, rng } from '../lib/sentences';
 import { daySeed, recordAnswer } from '../lib/daily';
 import SpeakButton from './SpeakButton';
@@ -7,6 +7,8 @@ interface Props {
   /** Optional step tag, e.g. "step04". Omit for a mixed set. */
   tag?: string;
   count?: number;
+  /** Fired once when the set is finished (e.g. to mark a journey station done). */
+  onComplete?: () => void;
 }
 
 interface Chip {
@@ -30,12 +32,18 @@ function makeBank(words: string[], seed: number): Chip[] {
 }
 
 /** Sentence-building drill: reassemble a Kyrgyz sentence (SOV) from a shuffled word bank. */
-export default function SentenceBuild({ tag, count = 6 }: Props) {
+export default function SentenceBuild({ tag, count = 6, onComplete }: Props) {
   const sentences = useMemo(() => pickSentences(count, daySeed(), tag), [count, tag]);
   const [index, setIndex] = useState(0);
   const [placed, setPlaced] = useState<number[]>([]);
   const [answered, setAnswered] = useState<null | boolean>(null);
   const [score, setScore] = useState(0);
+
+  const finished = sentences.length > 0 && index >= sentences.length;
+  useEffect(() => {
+    if (finished) onComplete?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once on completion
+  }, [finished]);
 
   const sentence = sentences[index];
   const bank = useMemo(

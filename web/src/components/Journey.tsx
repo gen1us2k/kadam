@@ -94,6 +94,16 @@ export default function Journey({ steps, deck }: Props) {
     });
   }
 
+  /** One-way completion signal from a station (drill/sentence set finished, exam passed). */
+  function markDone(id: string) {
+    setDone((d) => {
+      if (d[id]) return d;
+      const next = { ...d, [id]: true };
+      save(next);
+      return next;
+    });
+  }
+
   function goTo(idx: number) {
     if (idx >= 0 && idx < steps.length) setOpenIdx(idx);
   }
@@ -164,10 +174,12 @@ export default function Journey({ steps, deck }: Props) {
                   {(s.type === 'vocab' || s.type === 'review' || s.type === 'corpus') && (
                     <StudySession deck={deck} tag={s.type === 'review' ? undefined : s.tag} />
                   )}
-                  {s.type === 'drill' && <Drills types={s.drillTasks} />}
+                  {s.type === 'drill' && <Drills types={s.drillTasks} onComplete={() => markDone(s.id)} />}
                   {s.type === 'reader' && s.text && <Reader deck={deck} initialText={s.text} autoParse />}
-                  {s.type === 'sentence' && <SentenceBuild tag={s.tag} />}
-                  {s.type === 'exam' && s.tag && <StepExam deck={deck} tag={s.tag} drillTasks={s.drillTasks} />}
+                  {s.type === 'sentence' && <SentenceBuild tag={s.tag} onComplete={() => markDone(s.id)} />}
+                  {s.type === 'exam' && s.tag && (
+                    <StepExam deck={deck} tag={s.tag} drillTasks={s.drillTasks} examId={s.id} onPassed={() => markDone(s.id)} />
+                  )}
 
                   <div className="jstep-nav">
                     <button className="btn ghost" onClick={() => goTo(i - 1)} disabled={i === 0}>← Предыдущий</button>

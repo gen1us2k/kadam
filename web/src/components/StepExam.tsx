@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { DeckCard } from '../lib/srs';
 import { buildDrills } from '../lib/morphology';
 import { daySeed, recordAnswer } from '../lib/daily';
@@ -12,6 +12,37 @@ interface Props {
   drillTasks?: string[];
   /** Pass threshold, 0..1. */
   pass?: number;
+  /** Stable id for the best-score log (e.g. the journey step id). */
+  examId?: string;
+  /** Fired when a run reaches the pass threshold (e.g. to mark the journey step done). */
+  onPassed?: () => void;
+}
+
+// Best-score log per exam — closes the exam → journey loop and fuels the retry screen.
+const EXAM_KEY = 'kyrgyz-exams-v1';
+type ExamLog = Record<string, { best: number; total: number }>;
+
+function loadExamLog(): ExamLog {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(EXAM_KEY) ?? '{}') as ExamLog;
+  } catch {
+    return {};
+  }
+}
+
+function recordExam(examId: string, score: number, total: number): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const log = loadExamLog();
+    const prev = log[examId];
+    if (!prev || score > prev.best || prev.total !== total) {
+      log[examId] = { best: Math.max(score, prev?.total === total ? prev.best : 0), total };
+      localStorage.setItem(EXAM_KEY, JSON.stringify(log));
+    }
+  } catch {
+    // non-fatal
+  }
 }
 
 const KG_LETTERS = ['ң', 'ө', 'ү'];
@@ -58,7 +89,7 @@ function buildExam(deck: DeckCard[], tag: string, drillTasks: string[] | undefin
 }
 
 /** Milestone self-test: mixed vocab + grammar with a pass threshold. No SRS writes. */
-export default function StepExam({ deck, tag, drillTasks, pass = 0.8 }: Props) {
+export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, onPassed }: Props) {
   const [round, setRound] = useState(0);
   const questions = useMemo(
     () => buildExam(deck, tag, drillTasks, daySeed() + round),
@@ -69,6 +100,15 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8 }: Props) {
   const [typedValue, setTypedValue] = useState('');
   const [score, setScore] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const finished = questions.length > 0 && index >= questions.length;
+  const passedNow = finished && score / questions.length >= pass;
+  useEffect(() => {
+    if (!finished) return;
+    if (examId) recordExam(examId, score, questions.length);
+    if (passedNow) onPassed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once per finished run
+  }, [finished]);
 
   const q = questions[index];
 
@@ -117,10 +157,13 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8 }: Props) {
   if (index >= questions.length) {
     const pct = Math.round((score / questions.length) * 100);
     const passed = score / questions.length >= pass;
+    const logged = examId ? loadExamLog()[examId] : undefined;
+    const best = Math.max(score, logged?.total === questions.length ? logged.best : 0);
     return (
       <div className="study-summary">
         <h2>{passed ? '🎯 Сдано!' : 'Ещё не сдано'}</h2>
         <p>{score} из {questions.length} ({pct}%). Порог — {Math.round(pass * 100)}%.</p>
+        {best > score && <p className="study-meta">Лучший результат: {best}/{questions.length}.</p>}
         <p className="study-meta">
           {passed ? 'Шаг закреплён — двигайтесь дальше.' : 'Повторите слабые места и пересдайте.'}
         </p>

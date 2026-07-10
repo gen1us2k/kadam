@@ -123,17 +123,7 @@ export function buildJourney(parts: StepLessons[], deck: DeckCard[], extras: Jou
       });
     }
 
-    const sentCount = SENTENCES.filter((s) => s.tag === tag).length;
-    if (sentCount > 0) {
-      steps.push({
-        id: `s:${tag}`,
-        type: 'sentence',
-        title: 'Собери предложение',
-        subtitle: `${sentCount} фраз · порядок SOV`,
-        tag,
-      });
-    }
-
+    // Mechanics before composition: suffix drills first, then sentence building.
     const drill = DRILL_AFTER[part.slug];
     if (drill) {
       steps.push({
@@ -142,6 +132,17 @@ export function buildJourney(parts: StepLessons[], deck: DeckCard[], extras: Jou
         title: drill.title,
         subtitle: 'Суффиксы на автомат — письменно',
         drillTasks: drill.tasks,
+      });
+    }
+
+    const sentCount = SENTENCES.filter((s) => s.tag === tag).length;
+    if (sentCount > 0) {
+      steps.push({
+        id: `s:${tag}`,
+        type: 'sentence',
+        title: 'Собери предложение',
+        subtitle: `${sentCount} фраз · порядок SOV`,
+        tag,
       });
     }
 
