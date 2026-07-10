@@ -1,0 +1,17 @@
+{
+  "name": "kyrgyz-asr-server",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node main.ts",
+    "test": "node test-ctc.ts"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.19.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "typescript": "^7.0.2"
+  }
+}

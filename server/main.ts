@@ -1,0 +1,167 @@
+// Kyrgyz ASR + pronunciation-scoring backend (TypeScript, same stack as the web app).
+//
+// Moves the ~338 MB wav2vec2 ONNX model out of the browser: the web app records audio, uploads a
+// small 16 kHz mono WAV (~64 KB per phrase) as a raw POST body, and gets back the same Analysis
+// JSON the in-browser pipeline produced — {transcript, percent, letters}. CTC math lives in
+// ctc.ts, locked to the reference fixture by test-ctc.ts.
+//
+// Run (from server/):  npm install && npm start          # listens on :8000
+// Model files come from server/models/ — regenerate with web/scripts/export-asr.py.
+
+import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import * as ort from 'onnxruntime-node';
+import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
+
+const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('./models', import.meta.url));
+const PORT = Number(process.env.PORT ?? 8000);
+const SAMPLE_RATE = 16000;
+const MAX_SECONDS = 30;
+const MAX_BODY = 44 + MAX_SECONDS * SAMPLE_RATE * 2; // WAV header + 30 s of 16-bit samples
+
+interface AsrMeta {
+  pad_id: number;
+  word_delimiter: string;
+  do_normalize: boolean;
+}
+
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// --- model state, loaded once before listen ---
+const session = await ort.InferenceSession.create(`${MODELS_DIR}/model.onnx`);
+const vocab = JSON.parse(await readFile(`${MODELS_DIR}/vocab.json`, 'utf8')) as Record<string, number>;
+const meta = JSON.parse(await readFile(`${MODELS_DIR}/asr-meta.json`, 'utf8')) as AsrMeta;
+const idToToken = new Map<number, string>();
+for (const [tok, id] of Object.entries(vocab)) idToToken.set(id, tok);
+
+/** Parse a 16 kHz mono 16-bit PCM WAV into Float32 [-1, 1]. Throws 422 on anything else. */
+function parseWav(buf: Buffer): Float32Array {
+  const bad = (msg: string) => new HttpError(422, msg);
+  if (buf.length < 44 || buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WAVE') {
+    throw bad('not a WAV file');
+  }
+  // Walk chunks to find fmt and data (robust to extra chunks some encoders insert).
+  let fmt: { format: number; channels: number; rate: number; bits: number } | null = null;
+  let data: Buffer | null = null;
+  let off = 12;
+  while (off + 8 <= buf.length) {
+    const id = buf.toString('ascii', off, off + 4);
+    const size = buf.readUInt32LE(off + 4);
+    const body = buf.subarray(off + 8, Math.min(off + 8 + size, buf.length));
+    if (id === 'fmt ' && body.length >= 16) {
+      fmt = {
+        format: body.readUInt16LE(0),
+        channels: body.readUInt16LE(2),
+        rate: body.readUInt32LE(4),
+        bits: body.readUInt16LE(14),
+      };
+    } else if (id === 'data') {
+      data = body;
+    }
+    off += 8 + size + (size % 2); // chunks are word-aligned
+  }
+  if (!fmt || !data) throw bad('missing fmt/data chunk');
+  if (fmt.format !== 1 || fmt.channels !== 1 || fmt.rate !== SAMPLE_RATE || fmt.bits !== 16) {
+    throw bad('expected 16 kHz mono 16-bit PCM WAV');
+  }
+  const samples = Math.floor(data.length / 2); // tolerate a truncated trailing byte
+  if (samples > MAX_SECONDS * SAMPLE_RATE) throw new HttpError(413, `audio longer than ${MAX_SECONDS}s`);
+  if (samples < SAMPLE_RATE / 10) throw bad('audio too short');
+  const wave = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) wave[i] = data.readInt16LE(i * 2) / 32768;
+  return wave;
+}
+
+/** Zero-mean, unit-variance normalization — the wav2vec2 feature extractor's do_normalize. */
+function normalizeWave(wave: Float32Array): Float32Array {
+  let mean = 0;
+  for (let i = 0; i < wave.length; i++) mean += wave[i];
+  mean /= wave.length || 1;
+  let variance = 0;
+  for (let i = 0; i < wave.length; i++) variance += (wave[i] - mean) ** 2;
+  variance /= wave.length || 1;
+  const std = Math.sqrt(variance + 1e-7); // HF zero_mean_unit_var_norm: epsilon inside sqrt
+  const out = new Float32Array(wave.length);
+  for (let i = 0; i < wave.length; i++) out[i] = (wave[i] - mean) / std;
+  return out;
+}
+
+/** Target phrase -> CTC token ids + display chars (space -> delimiter, off-head ids dropped). */
+function targetTokens(text: string, outputDim: number): { ids: number[]; chars: string[] } {
+  const ids: number[] = [];
+  const chars: string[] = [];
+  for (const raw of text.toLowerCase().replace(/ё/g, 'е')) {
+    const ch = raw === ' ' ? meta.word_delimiter : raw;
+    const id = vocab[ch];
+    if (id === undefined || id >= outputDim) continue;
+    ids.push(id);
+    chars.push(raw);
+  }
+  return { ids, chars };
+}
+
+async function analyze(wavBody: Buffer, target: string) {
+  const wave = parseWav(wavBody);
+  const input = meta.do_normalize ? normalizeWave(wave) : wave;
+  const feeds = { [session.inputNames[0]]: new ort.Tensor('float32', input, [1, input.length]) };
+  const out = await session.run(feeds);
+  const logits = out[session.outputNames[0]];
+  const frames = logits.dims[1] as number;
+  const vocabDim = logits.dims[2] as number;
+  const probs = softmaxRows(logits.data as Float32Array, frames, vocabDim);
+
+  const transcript = greedyDecode(probs, frames, vocabDim, idToToken, meta.pad_id, meta.word_delimiter);
+  const { ids, chars } = targetTokens(target, vocabDim);
+  const gop = forcedAlignGop(probs, frames, vocabDim, ids, meta.pad_id);
+  const letters = chars.map((ch, i) =>
+    ch === ' ' ? { ch: ' ', score: 0, gap: true } : { ch, score: Math.round(gop[i] * 10000) / 10000 },
+  );
+  const scored = chars.map((ch, i) => (ch === ' ' ? null : gop[i])).filter((v): v is number => v !== null);
+  const percent = scored.length === 0 ? 0 : Math.round((scored.reduce((a, b) => a + b, 0) / scored.length) * 100);
+  return { transcript, percent, letters };
+}
+
+const server = createServer(async (req, res) => {
+  // CORS: same-origin in normal use (astro dev proxies /api); allow localhost tooling.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  const url = new URL(req.url ?? '/', 'http://localhost');
+  const send = (status: number, body: unknown) => {
+    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(body));
+  };
+
+  try {
+    if (req.method === 'OPTIONS') return void res.writeHead(204).end();
+    if (req.method === 'GET' && url.pathname === '/api/health') return send(200, { ok: true });
+    if (req.method === 'POST' && url.pathname === '/api/asr/analyze') {
+      const target = url.searchParams.get('target')?.trim();
+      if (!target) throw new HttpError(422, 'missing ?target=');
+      const declared = Number(req.headers['content-length'] ?? 0);
+      if (declared > MAX_BODY) throw new HttpError(413, 'body too large');
+      const chunks: Buffer[] = [];
+      let received = 0;
+      for await (const chunk of req) {
+        received += (chunk as Buffer).length;
+        if (received > MAX_BODY) throw new HttpError(413, 'body too large');
+        chunks.push(chunk as Buffer);
+      }
+      return send(200, await analyze(Buffer.concat(chunks), target));
+    }
+    send(404, { error: 'not found' });
+  } catch (e) {
+    if (e instanceof HttpError) return send(e.status, { error: e.message });
+    console.error(e);
+    send(500, { error: 'internal error' });
+  }
+});
+
+server.listen(PORT, () => console.log(`kyrgyz-asr listening on :${PORT} (models: ${MODELS_DIR})`));

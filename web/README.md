@@ -107,20 +107,21 @@ X нед.». Прогресс шагов слов/корпуса считает�
 ## Распознавание речи + проверка произношения (PoC)
 
 Страница `/poc-speech` — прототип: запись с микрофона, распознавание кыргызской речи и оценка
-произношения. Распознавание работает **на бэкенде** (`server/`, FastAPI + onnxruntime,
-iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8): браузер записывает голос, чистит вход (mono +
-noiseSuppression/AGC, обрезка тишины — `lib/audio.ts`) и шлёт маленький 16-кГц WAV (~64 КБ на
-фразу) — модель (~338 МБ) в браузер больше не грузится.
+произношения. Распознавание работает **на бэкенде** (`server/` — TypeScript, тот же стек:
+node:http + onnxruntime-node, iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8): браузер
+записывает голос, чистит вход (mono + noiseSuppression/AGC, обрезка тишины — `lib/audio.ts`) и
+шлёт маленький 16-кГц WAV (~64 КБ на фразу) сырым POST-body — модель (~338 МБ) в браузер больше
+не грузится.
 
 Оценка — по **CTC forced alignment** к целевой фразе: раз фраза известна, аудио выравнивается
 (Viterbi) на ожидаемые звуки, и для каждой буквы берётся её акустическая уверенность
 (Goodness-of-Pronunciation) → % + подсветка по буквам. Устойчивее нечёткого сравнения
-транскрипта. CTC-математика — `server/ctc.py`, залочена на эталонную фикстуру
-(`scripts/ctc-fixture.json` ↔ `server/test_ctc.py`).
+транскрипта. CTC-математика — `server/ctc.ts`, залочена на эталонную фикстуру
+(`scripts/ctc-fixture.json` ↔ `server/test-ctc.ts`).
 
-Запуск: `cd server && pip install -r requirements.txt && uvicorn main:app --port 8000`;
-dev-сервер Astro проксирует `/api` на :8000 (см. `astro.config.mjs`). Веса модели гитигнорены
-(>100 МБ); регенерация:
+Запуск: `cd server && npm install && npm start` (порт 8000, Node ≥23); dev-сервер Astro
+проксирует `/api` на :8000 (см. `astro.config.mjs`). Веса модели гитигнорены (>100 МБ);
+регенерация:
 
 ```
 cd web && python3 -m venv .venv && source .venv/bin/activate
