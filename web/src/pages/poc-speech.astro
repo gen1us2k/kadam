@@ -1,0 +1,22 @@
+---
+import Base from '../layouts/Base.astro';
+import SpeechCheck from '../components/SpeechCheck.tsx';
+---
+
+<Base title="Речь (PoC) · Кыргызча 80/20" active="/poc-speech">
+  <section class="prose">
+    <h1>Проверка произношения — PoC</h1>
+    <p>
+      Прототип: распознавание кыргызской речи прямо в браузере (wav2vec2-large-xlsr-kyrgyz,
+      экспорт в ONNX int8, запуск через onnxruntime-web — без сервера и ключей) плюс сравнение
+      с целевой фразой. Модель (~338 МБ) скачивается один раз при первой записи.
+    </p>
+    <p class="study-meta">
+      Как «слышит» распознаватель, так и оценивает — это v0 (сверка транскрипта с целью),
+      а не пофонемный GOP. Модель обучена на живом Common Voice; на синтезе и на шумном
+      микрофоне возможны промахи. Нужен HTTPS или localhost для доступа к микрофону.
+    </p>
+  </section>
+
+  <SpeechCheck client:load />
+</Base>

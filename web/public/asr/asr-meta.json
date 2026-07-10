@@ -1,0 +1,7 @@
+{
+  "pad_token": "[PAD]",
+  "pad_id": 39,
+  "word_delimiter": "|",
+  "do_normalize": true,
+  "sampling_rate": 16000
+}
