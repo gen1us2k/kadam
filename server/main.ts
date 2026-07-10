@@ -8,17 +8,39 @@
 // Run (from server/):  npm install && npm start          # listens on :8000
 // Model files come from server/models/ — regenerate with web/scripts/export-asr.py.
 
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { createServer, type ServerResponse } from 'node:http';
+import { createReadStream } from 'node:fs';
+import { readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { extname, resolve, sep } from 'node:path';
 import * as ort from 'onnxruntime-node';
 import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
 
 const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('./models', import.meta.url));
+// The built web app (astro build -> web/dist) is served from the same port as /api.
+const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL('../web/dist', import.meta.url));
 const PORT = Number(process.env.PORT ?? 8000);
 const SAMPLE_RATE = 16000;
 const MAX_SECONDS = 30;
 const MAX_BODY = 44 + MAX_SECONDS * SAMPLE_RATE * 2; // WAV header + 30 s of 16-bit samples
+
+const CONTENT_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.wasm': 'application/wasm',
+  '.onnx': 'application/octet-stream',
+  '.txt': 'text/plain; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.webmanifest': 'application/manifest+json',
+  '.woff2': 'font/woff2',
+  '.map': 'application/json',
+};
 
 interface AsrMeta {
   pad_id: number;
@@ -139,8 +161,52 @@ async function analyze(wavBody: Buffer, target: string) {
   return { transcript, percent, letters };
 }
 
-// Astro dev/preview origins. Same-origin in normal use (astro proxies /api); the header only
-// matters when the page talks to :8000 directly. Widen deliberately if ever deployed.
+/** Map a request path to a file inside STATIC_DIR, or null if it escapes the root. */
+function resolveStatic(pathname: string): string | null {
+  let p: string;
+  try {
+    p = decodeURIComponent(pathname);
+  } catch {
+    return null; // malformed percent-encoding
+  }
+  if (p.endsWith('/')) p += 'index.html';
+  else if (!extname(p)) p += '/index.html'; // Astro emits /route/index.html
+  const full = resolve(STATIC_DIR, `.${p}`);
+  if (full !== STATIC_DIR && !full.startsWith(STATIC_DIR + sep)) return null; // path traversal
+  return full;
+}
+
+/** Serve a built static asset from web/dist. Streams (the TTS model is ~113 MB). */
+async function serveStatic(pathname: string, res: ServerResponse): Promise<void> {
+  const file = resolveStatic(pathname);
+  if (!file) {
+    res.writeHead(400).end('bad path');
+    return;
+  }
+  let size: number;
+  try {
+    const s = await stat(file);
+    if (!s.isFile()) throw new Error('not a file');
+    size = s.size;
+  } catch {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('not found');
+    return;
+  }
+  const ext = extname(file);
+  const headers: Record<string, string> = {
+    'Content-Type': CONTENT_TYPES[ext] ?? 'application/octet-stream',
+    'Content-Length': String(size),
+    // Astro fingerprints _astro/* and the model/wasm are effectively immutable; HTML must revalidate.
+    'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000, immutable',
+  };
+  res.writeHead(200, headers);
+  createReadStream(file)
+    .on('error', () => res.destroyed || res.end())
+    .pipe(res);
+}
+
+// Astro dev/preview origins. Same-origin in normal use (unified server or astro proxy); the
+// header only matters when the page talks to the API cross-origin. Widen deliberately if deployed.
 const ALLOWED_ORIGINS = new Set(['http://localhost:4321', 'http://localhost:4322']);
 
 const server = createServer(async (req, res) => {
@@ -171,6 +237,9 @@ const server = createServer(async (req, res) => {
       }
       return send(200, await analyze(Buffer.concat(chunks), target));
     }
+    if (url.pathname.startsWith('/api/')) return send(404, { error: 'not found' });
+    // Everything else: the built web app.
+    if (req.method === 'GET' || req.method === 'HEAD') return void (await serveStatic(url.pathname, res));
     send(404, { error: 'not found' });
   } catch (e) {
     if (e instanceof HttpError) return send(e.status, { error: e.message });
@@ -179,4 +248,10 @@ const server = createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log(`kyrgyz-asr listening on :${PORT} (models: ${MODELS_DIR})`));
+try {
+  if (!(await stat(`${STATIC_DIR}/index.html`)).isFile()) throw new Error();
+} catch {
+  console.warn(`[warn] ${STATIC_DIR}/index.html not found — run \`cd web && npm run build\` to serve the app`);
+}
+
+server.listen(PORT, () => console.log(`kyrgyz app on http://localhost:${PORT}  (api + web/dist, models: ${MODELS_DIR})`));

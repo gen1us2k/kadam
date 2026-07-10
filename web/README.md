@@ -119,9 +119,18 @@ node:http + onnxruntime-node, iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8)
 транскрипта. CTC-математика — `server/ctc.ts`, залочена на эталонную фикстуру
 (`scripts/ctc-fixture.json` ↔ `server/test-ctc.ts`).
 
-Запуск: `cd server && npm install && npm start` (порт 8000, Node ≥23); dev-сервер Astro
-проксирует `/api` на :8000 (см. `astro.config.mjs`). Веса модели гитигнорены (>100 МБ);
-регенерация:
+Запуск (одно приложение, один порт): собрать сайт и поднять сервер — он раздаёт и статику
+`web/dist`, и `/api` с одного порта (8000, Node ≥23):
+
+```
+cd web && npm install && npm run build
+cd ../server && npm install && npm start   # http://localhost:8000 — сайт + API
+# или одной командой из server/: npm run serve  (собирает web, затем стартует)
+```
+
+Для разработки удобнее `cd web && npm run dev` (:4321 с HMR) — он проксирует `/api` на :8000
+(см. `astro.config.mjs`), так что сервер тоже должен быть запущен. Веса модели гитигнорены
+(>100 МБ); регенерация:
 
 ```
 cd web && python3 -m venv .venv && source .venv/bin/activate
