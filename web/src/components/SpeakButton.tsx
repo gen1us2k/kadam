@@ -3,7 +3,7 @@ import { speak } from '../lib/tts';
 import type { TtsStatus } from '../lib/tts';
 
 const LABEL: Record<TtsStatus, string> = {
-  downloading: 'загрузка модели… (~113 МБ, один раз)',
+  downloading: 'загрузка модели… (локально, один раз)',
   loading: 'запуск…',
   synthesizing: 'синтез…',
   playing: '▶ играет',

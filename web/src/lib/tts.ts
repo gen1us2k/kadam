@@ -1,12 +1,11 @@
 // In-browser Kyrgyz TTS: Meta MMS (facebook/mms-tts-kir) as ONNX, run with onnxruntime-web.
-// The model (~113 MB fp32) is fetched once from the HuggingFace CDN and kept in the Cache API;
-// synthesis is fully client-side afterwards — no backend, no keys. int8 quantization was tried
-// and rejected: the graph's ConvInteger nodes are unsupported by ORT.
+// The model (~114 MB fp32) ships in the repo under public/tts and is served locally — no CDN,
+// no backend, no keys. The browser HTTP-caches the static file; init() loads it once per session.
+// int8 quantization was tried and rejected: the graph's ConvInteger nodes are unsupported by ORT.
 
-const REPO = 'https://huggingface.co/willwade/mms-tts-multilingual-models-onnx/resolve/main/kir';
-const MODEL_URL = `${REPO}/model.onnx`;
-const TOKENS_URL = `${REPO}/tokens.txt`;
-const CACHE_NAME = 'kyrgyz-tts-v1';
+const BASE = import.meta.env.BASE_URL; // '/' by default; honours a configured Astro `base`
+const MODEL_URL = `${BASE}tts/model.onnx`;
+const TOKENS_URL = `${BASE}tts/tokens.txt`;
 const SAMPLE_RATE = 16000;
 
 export type TtsStatus = 'downloading' | 'loading' | 'synthesizing' | 'playing' | 'done' | 'error';
@@ -18,21 +17,11 @@ let initPromise: Promise<{ ort: Ort; session: Session; tokens: Map<string, numbe
 let audioCtx: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
 
-async function fetchCached(url: string): Promise<Response> {
-  try {
-    const cache = await caches.open(CACHE_NAME);
-    const hit = await cache.match(url);
-    if (hit) return hit;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`fetch ${url}: ${res.status}`);
-    await cache.put(url, res.clone());
-    return res;
-  } catch {
-    // Cache API unavailable (private mode) — plain fetch.
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`fetch ${url}: ${res.status}`);
-    return res;
-  }
+async function fetchAsset(url: string): Promise<Response> {
+  // Local static asset (public/tts) — the browser handles HTTP caching across sessions.
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`fetch ${url}: ${res.status}`);
+  return res;
 }
 
 function parseTokens(text: string): Map<string, number> {
@@ -58,7 +47,7 @@ function init(onStatus?: (s: TtsStatus) => void) {
       onStatus?.('downloading');
       // Vite emits the ORT wasm as a local hashed asset; the runtime resolves it itself.
       const ort = await import('onnxruntime-web');
-      const [tokensRes, modelRes] = await Promise.all([fetchCached(TOKENS_URL), fetchCached(MODEL_URL)]);
+      const [tokensRes, modelRes] = await Promise.all([fetchAsset(TOKENS_URL), fetchAsset(MODEL_URL)]);
       const tokens = parseTokens(await tokensRes.text());
       const model = await modelRes.arrayBuffer();
       onStatus?.('loading');
