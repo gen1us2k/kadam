@@ -4,7 +4,7 @@
 The model weights are gitignored (~338 MB > GitHub's 100 MB limit), so regenerate them here.
 
     python3 -m venv .venv && source .venv/bin/activate
-    pip install torch transformers onnx onnxruntime
+    pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
     python scripts/export-asr.py
 
 Writes public/asr/{model.onnx, vocab.json, asr-meta.json}. The runtime side lives in

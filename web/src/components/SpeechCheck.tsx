@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Recorder } from '../lib/audio';
 import { recognize } from '../lib/asr';
 import type { AsrStatus } from '../lib/asr';
@@ -28,14 +28,18 @@ const STATUS_COLOR: Record<string, string> = { ok: '#1a7f37', wrong: 'var(--acce
 export default function SpeechCheck() {
   const [idx, setIdx] = useState(0);
   const [recording, setRecording] = useState(false);
+  const [processing, setProcessing] = useState(false); // stop -> recognize -> score window
   const [asrStatus, setAsrStatus] = useState<AsrStatus | null>(null);
   const [heard, setHeard] = useState<string | null>(null);
   const [score, setScore] = useState<Score | null>(null);
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<Recorder | null>(null);
 
+  // Release the mic if the user navigates away mid-recording.
+  useEffect(() => () => recorderRef.current?.cancel(), []);
+
   const phrase = PHRASES[idx];
-  const busy = asrStatus !== null && asrStatus !== 'done' && asrStatus !== 'error';
+  const busy = processing;
 
   function reset() {
     setHeard(null);
@@ -60,6 +64,7 @@ export default function SpeechCheck() {
     const rec = recorderRef.current;
     if (!rec) return;
     setRecording(false);
+    setProcessing(true); // guard the stop -> recognize -> score window (mic still settling)
     try {
       const wave = await rec.stop();
       const text = await recognize(wave, setAsrStatus);
@@ -69,6 +74,7 @@ export default function SpeechCheck() {
       setError('Не удалось распознать. Попробуйте ещё раз.');
     } finally {
       recorderRef.current = null;
+      setProcessing(false);
     }
   }
 

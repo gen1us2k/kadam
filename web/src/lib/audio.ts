@@ -36,6 +36,15 @@ export class Recorder {
     const bytes = await blob.arrayBuffer();
     return decodeTo16kMono(bytes);
   }
+
+  /** Abort recording and release the mic without decoding (e.g. on unmount). */
+  cancel(): void {
+    if (this.media && this.media.state !== 'inactive') this.media.stop();
+    this.stream?.getTracks().forEach((t) => t.stop());
+    this.stream = null;
+    this.media = null;
+    this.chunks = [];
+  }
 }
 
 /** Decode an encoded audio blob and resample to 16 kHz mono Float32. */
@@ -43,8 +52,12 @@ async function decodeTo16kMono(bytes: ArrayBuffer): Promise<Float32Array> {
   const AudioCtx: typeof AudioContext =
     window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
   const tmp = new AudioCtx();
-  const decoded = await tmp.decodeAudioData(bytes.slice(0));
-  await tmp.close();
+  let decoded: AudioBuffer;
+  try {
+    decoded = await tmp.decodeAudioData(bytes.slice(0));
+  } finally {
+    await tmp.close();
+  }
 
   const frames = Math.round((decoded.duration * TARGET_RATE));
   const offline = new OfflineAudioContext(1, frames, TARGET_RATE);

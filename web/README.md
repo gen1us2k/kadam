@@ -103,3 +103,23 @@ X нед.». Прогресс шагов слов/корпуса считает�
 > Размер: `model.onnx` — 114 МБ. Репозиторий локальный, remote нет, поэтому файл закоммичен
 > напрямую. Если будете пушить на GitHub — он режет файлы >100 МБ, понадобится Git LFS
 > (`git lfs track "*.onnx"`); LFS сейчас не установлен.
+
+## Распознавание речи + проверка произношения (PoC)
+
+Страница `/poc-speech` — прототип: запись с микрофона, распознавание кыргызской речи **в
+браузере** (iarfmoose/wav2vec2-large-xlsr-kyrgyz, экспорт в ONNX int8, через onnxruntime-web —
+`lib/asr.ts`, `lib/audio.ts`), затем сверка транскрипта с целевой фразой (`lib/pronunciation.ts`,
+v0 — не пофонемный GOP). Полностью клиентское, аудио никуда не уходит.
+
+Веса модели (~338 МБ) **не в репозитории** (`.gitignore` → `public/**/model.onnx`, >100 МБ).
+После свежего чекаута `/poc-speech` не заработает, пока модель не сгенерирована:
+
+```
+cd web && python3 -m venv .venv && source .venv/bin/activate
+pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
+python scripts/export-asr.py   # пишет public/asr/{model.onnx, vocab.json, asr-meta.json}
+```
+
+Метаданные декодера (`vocab.json`, `asr-meta.json`) — маленькие, закоммичены; регенерируются тем
+же скриптом. Квантование **только MatMul**: динамический int8 conv-слоёв даёт `ConvInteger`,
+не поддержанный wasm-бэкендом ORT (та же стена, что у TTS).

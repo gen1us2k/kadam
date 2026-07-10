@@ -70,7 +70,7 @@ function normalize(wave: Float32Array): Float32Array {
   let variance = 0;
   for (let i = 0; i < wave.length; i++) variance += (wave[i] - mean) ** 2;
   variance /= wave.length || 1;
-  const std = Math.sqrt(variance) + 1e-7;
+  const std = Math.sqrt(variance + 1e-7); // HF zero_mean_unit_var_norm: epsilon inside sqrt
   const out = new Float32Array(wave.length);
   for (let i = 0; i < wave.length; i++) out[i] = (wave[i] - mean) / std;
   return out;
