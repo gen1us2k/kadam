@@ -1,19 +1,31 @@
 ---
 import Base from '../layouts/Base.astro';
 import StudySession from '../components/StudySession.tsx';
+import Drills from '../components/Drills.tsx';
+import StatsPanel from '../components/StatsPanel.tsx';
 import { loadVocab } from '../lib/vocab';
 
 const deck = loadVocab();
 ---
 
-<Base title="Повторение · Кыргызча 80/20" active="/study">
+<Base title="Дневная сессия · Кыргызча 80/20" active="/study">
   <section class="prose">
-    <h1>Повторение на сегодня</h1>
+    <h1>Дневная сессия</h1>
     <p>
-      Интервальное повторение по системе Лейтнера: выбирайте перевод. Ответили верно — слово
-      вернётся позже; ошиблись — скоро снова. Прогресс хранится в браузере.
+      Смешанное повторение (FSRS): просроченные карточки со всех тем + новые, вперемешку.
+      Новые слова показываются на узнавание, зрелые — на письмо и cloze. Ошиблись — слово
+      вернётся через 10 минут.
     </p>
   </section>
 
+  <StatsPanel deck={deck} client:load />
+
   <StudySession deck={deck} client:load />
+
+  <section class="prose" style="margin-top:2.5rem">
+    <h2>Грамматические дриллы</h2>
+    <p class="study-meta">Суффиксы на автомат: множественное число и падежи — по правилам сингармонизма.</p>
+  </section>
+
+  <Drills client:visible />
 </Base>

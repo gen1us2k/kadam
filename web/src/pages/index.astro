@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Journey from '../components/Journey.tsx';
+import DailyBanner from '../components/DailyBanner.tsx';
 import { getCollection } from 'astro:content';
 import { loadVocab } from '../lib/vocab';
 import { splitLessons } from '../lib/lessons';
@@ -32,6 +33,8 @@ const steps = buildJourney(weeks, deck);
       повторение. Открывайте шаг, проходите его, отмечайте пройденным. Прогресс сохраняется.
     </p>
   </section>
+
+  <DailyBanner deck={deck} client:load />
 
   <Journey steps={steps} deck={deck} client:load />
 </Base>

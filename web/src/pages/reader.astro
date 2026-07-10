@@ -1,0 +1,20 @@
+---
+import Base from '../layouts/Base.astro';
+import Reader from '../components/Reader.tsx';
+import { loadVocab } from '../lib/vocab';
+
+const deck = loadVocab();
+---
+
+<Base title="Чтение · Кыргызча 80/20" active="/reader">
+  <section class="prose">
+    <h1>Чтение с подсказками</h1>
+    <p>
+      Вставьте любой кыргызский текст (новость Азаттык, пост, сообщение) и кликайте по словам —
+      словарь курса подскажет перевод. Суффиксы отрезаются автоматически: <i>базарга</i> найдёт
+      <i>базар</i>.
+    </p>
+  </section>
+
+  <Reader deck={deck} client:load />
+</Base>

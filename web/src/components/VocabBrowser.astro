@@ -34,7 +34,7 @@ const hasExamples = rows.some((r) => r.example);
       <tbody id="vocab-body">
         {rows.map((r) => (
           <tr data-kg={r.kg.toLowerCase()} data-ru={r.ru.toLowerCase()} data-tags={r.tags.join(' ')}>
-            <td>{r.kg}</td>
+            <td><a href={`https://ru.forvo.com/word/${encodeURIComponent(r.kg)}/#ky`} target="_blank" rel="noreferrer" title="Произношение на Forvo">{r.kg}</a></td>
             <td>{r.ru}</td>
             {hasExamples && <td class="ex">{r.example ?? ''}</td>}
             <td>{r.tags.join(', ')}</td>
