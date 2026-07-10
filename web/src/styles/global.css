@@ -279,6 +279,11 @@ tr[hidden] { display: none; }
 .sent-chip.placed { background: var(--accent-soft); border-color: var(--accent); }
 .sent-chip:disabled { cursor: default; }
 
+/* Daily plan + trust/leech flags */
+.today-plan { display: flex; flex-wrap: wrap; gap: 0.4rem 0.9rem; margin: 0.35rem 0; font-size: 0.95rem; }
+.unverified-note { margin-top: 0.5rem; color: #b26a00; }
+.leech-line { margin-top: 0.6rem; }
+
 /* Embedded pronunciation */
 .say-btn {
   border: none;

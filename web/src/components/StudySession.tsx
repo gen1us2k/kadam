@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildQueue, cardId, deckStats, grade, loadStore, saveStore } from '../lib/srs';
+import { buildQueue, cardId, deckStats, grade, isUnverified, loadStore, saveStore } from '../lib/srs';
 import type { DeckCard, Store } from '../lib/srs';
 import { loadDaily, recordAnswer } from '../lib/daily';
 import type { DailyState } from '../lib/daily';
@@ -244,6 +244,9 @@ export default function StudySession({ deck, tag }: Props) {
               <div className="study-example">
                 {card.example} <SpeakButton text={card.example} title="Озвучить пример" />
               </div>
+            )}
+            {isUnverified(card) && (
+              <div className="study-meta unverified-note">⚠ Перевод сгенерирован, не проверен носителем</div>
             )}
           </div>
         )}

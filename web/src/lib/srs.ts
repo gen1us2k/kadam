@@ -2,7 +2,7 @@
 // this module owns card state, persistence (with migration from the old Leitner store),
 // queue building (interleaved daily mix) and deck statistics.
 
-import { fsrsInit, fsrsReview, fsrsInterval } from './fsrs';
+import { fsrsInit, fsrsReview, fsrsInterval, retrievability } from './fsrs';
 
 export interface CardState {
   /** FSRS stability (days). */
@@ -32,6 +32,33 @@ export type Store = Record<string, CardState>;
 const DAY = 24 * 60 * 60 * 1000;
 /** Relearning delay after a failed answer. */
 const RELEARN_MS = 10 * 60 * 1000;
+/** Lapses at which a card becomes a "leech" (Anki default): drilling it further wastes time. */
+const LEECH_LAPSES = 8;
+/** Predicted-recall threshold above which a reviewed card counts as retained ("learned"). */
+const RETAIN = 0.8;
+/** New cards introduced per session when there is no review backlog. */
+const BASE_NEW = 15;
+
+/** A card that keeps failing. Handled specially (mnemonic/native review), kept out of the queue. */
+export function isLeech(state: CardState | undefined): boolean {
+  return !!state && state.lapses >= LEECH_LAPSES;
+}
+
+/** Corpus rows carry an explicit "unverified" tag; the curated step deck is trusted. */
+export function isUnverified(card: Pick<DeckCard, 'tags'>): boolean {
+  return card.tags.includes('unverified');
+}
+
+/** Predicted recall probability right now (0 if never seen). */
+export function retention(state: CardState | undefined, now: number): number {
+  if (!state) return 0;
+  return retrievability(Math.max(0, (now - state.last) / DAY), state.s);
+}
+
+/** Throttle new-card intake as the review backlog grows, to keep daily load sustainable. */
+export function adaptiveNewLimit(dueCount: number, base = BASE_NEW): number {
+  return Math.max(0, base - Math.floor(dueCount / 2));
+}
 
 /** Stable identity for a card. kg alone can collide (homographs), so pair it with ru. */
 export function cardId(card: Pick<DeckCard, 'kg' | 'ru'>): string {
@@ -95,11 +122,14 @@ export function buildQueue(deck: DeckCard[], store: Store, now: number, opts: Qu
   const fresh: DeckCard[] = [];
   for (const card of pool) {
     const state = store[cardId(card)];
+    if (isLeech(state)) continue; // suspended: handled separately, not drilled blindly
     if (!state) fresh.push(card);
     else if (state.due <= now) due.push(card);
   }
-  const newLimit = opts.newLimit ?? 15;
-  const queue = shuffle([...due, ...fresh.slice(0, newLimit)]);
+  const newLimit = opts.newLimit ?? adaptiveNewLimit(due.length);
+  // Verified-first: introduce trusted (curated / verified) words before model-generated ones.
+  const orderedFresh = [...fresh].sort((a, b) => Number(isUnverified(a)) - Number(isUnverified(b)));
+  const queue = shuffle([...due, ...orderedFresh.slice(0, newLimit)]);
   return opts.max ? queue.slice(0, opts.max) : queue;
 }
 
@@ -107,12 +137,16 @@ export interface DeckStats {
   total: number;
   /** Cards with any saved state. */
   seen: number;
-  /** Previously-seen cards whose review time has passed. */
+  /** Reviewable cards (seen, not a leech) whose review time has passed. */
   due: number;
   /** Never-seen cards. */
   fresh: number;
   /** Cards with stability >= 21 days. */
   mature: number;
+  /** Cards reviewed >= 2 times and still likely recalled now ("learned"). */
+  retained: number;
+  /** Cards suspended as leeches (too many lapses). */
+  leeches: number;
   /** Total reviews across the pool. */
   reps: number;
   /** Total lapses across the pool. */
@@ -121,7 +155,7 @@ export interface DeckStats {
 
 export function deckStats(deck: DeckCard[], store: Store, now: number, tag?: string): DeckStats {
   const pool = tag ? deck.filter((c) => c.tags.includes(tag)) : deck;
-  const st: DeckStats = { total: pool.length, seen: 0, due: 0, fresh: 0, mature: 0, reps: 0, lapses: 0 };
+  const st: DeckStats = { total: pool.length, seen: 0, due: 0, fresh: 0, mature: 0, retained: 0, leeches: 0, reps: 0, lapses: 0 };
   for (const card of pool) {
     const state = store[cardId(card)];
     if (!state) {
@@ -129,12 +163,24 @@ export function deckStats(deck: DeckCard[], store: Store, now: number, tag?: str
       continue;
     }
     st.seen++;
-    if (state.due <= now) st.due++;
+    const leech = isLeech(state);
+    if (leech) st.leeches++;
+    else if (state.due <= now) st.due++; // leeches are suspended, not counted as due
     if (state.s >= 21) st.mature++;
+    // Retained = learned: reviewed >= 2 times, still likely recalled, and not a leech.
+    if (!leech && state.reps >= 2 && retention(state, now) >= RETAIN) st.retained++;
     st.reps += state.reps;
     st.lapses += state.lapses;
   }
   return st;
+}
+
+/** Leech cards (most lapses first): need a mnemonic or native review, not blind repetition. */
+export function leechCards(deck: DeckCard[], store: Store): { card: DeckCard; state: CardState }[] {
+  return deck
+    .map((card) => ({ card, state: store[cardId(card)] }))
+    .filter((x): x is { card: DeckCard; state: CardState } => isLeech(x.state))
+    .sort((a, b) => b.state.lapses - a.state.lapses);
 }
 
 /** Weakest cards: most lapses first, then lowest stability. */

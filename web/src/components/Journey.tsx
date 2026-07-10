@@ -96,10 +96,10 @@ export default function Journey({ steps, deck }: Props) {
     import('../lib/tts').then((m) => m.speak(btn.dataset.say as string)).catch(() => {});
   }
 
-  /** A vocab/corpus step counts as done once 80% of its words are introduced. */
+  /** A vocab/corpus step counts as done once 80% of its words are retained (learned), not merely seen. */
   const isAutoDone = (s: JourneyStep) => {
     const st = mastery[s.id];
-    return !!st && st.total > 0 && st.seen / st.total >= 0.8;
+    return !!st && st.total > 0 && st.retained / st.total >= 0.8;
   };
   const isStepDone = (s: JourneyStep) => !!done[s.id] || isAutoDone(s);
 
@@ -123,7 +123,7 @@ export default function Journey({ steps, deck }: Props) {
           const isOpen = i === openIdx;
           const st = mastery[s.id];
           const masteryLine = st && st.seen > 0
-            ? `изучено ${st.seen}/${st.total} · зрелых ${st.mature}${st.due ? ` · к повторению ${st.due}` : ''}`
+            ? `изучено ${st.seen}/${st.total} · удержано ${st.retained}${st.due ? ` · к повт. ${st.due}` : ''}`
             : s.subtitle;
           return (
             <li
