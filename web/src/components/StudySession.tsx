@@ -15,9 +15,9 @@ interface Props {
 /**
  * Card mode ladder (recognition → production):
  * new cards — multiple choice KG→RU; young — multiple choice RU→KG;
- * mature — typed RU→KG, alternating with cloze when an example exists.
+ * mature — rotates dictation (listen → type), cloze (when an example exists) and typed RU→KG.
  */
-type Mode = 'mc' | 'mcrev' | 'typed' | 'cloze';
+type Mode = 'mc' | 'mcrev' | 'typed' | 'cloze' | 'listen';
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -54,7 +54,10 @@ function modeFor(card: DeckCard, store: Store): Mode {
   const st = store[cardId(card)];
   if (!st || st.reps < 2) return 'mc';
   if (st.s < 7) return 'mcrev';
-  if (clozeToken(card) && st.reps % 2 === 0) return 'cloze';
+  // Mature: rotate dictation / cloze / typed for varied production + listening practice.
+  const slot = st.reps % 3;
+  if (slot === 0) return 'listen';
+  if (slot === 1 && clozeToken(card)) return 'cloze';
   return 'typed';
 }
 
@@ -166,6 +169,7 @@ export default function StudySession({ deck, tag }: Props) {
     mode === 'mc' ? 'Переведите на русский:'
     : mode === 'mcrev' ? 'Как это по-кыргызски?'
     : mode === 'typed' ? 'Напишите по-кыргызски:'
+    : mode === 'listen' ? 'Прослушайте и впишите по-кыргызски:'
     : 'Впишите пропущенное слово:';
   const promptText =
     mode === 'mc' ? card.kg
@@ -178,7 +182,14 @@ export default function StudySession({ deck, tag }: Props) {
       <div className="study-progress">Вопрос {index + 1} / {queue.length}</div>
       <div className="study-card">
         <div className="prompt-label">{promptLabel}</div>
-        <div className={mode === 'cloze' ? 'prompt-cloze' : 'prompt-kg'}>{promptText}</div>
+        {mode === 'listen' ? (
+          <div className="prompt-listen">
+            <SpeakButton text={card.kg} title="Прослушать снова" />
+            <span className="study-meta">Нажмите 🔊 и запишите, что услышали</span>
+          </div>
+        ) : (
+          <div className={mode === 'cloze' ? 'prompt-cloze' : 'prompt-kg'}>{promptText}</div>
+        )}
         {mode === 'cloze' && <div className="study-meta">Подсказка: {card.ru}</div>}
 
         {isChoice && (

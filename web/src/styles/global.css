@@ -260,6 +260,25 @@ tr[hidden] { display: none; }
 .kbd-btn:hover:not(:disabled) { border-color: var(--accent); }
 .typed-tools .btn { margin-left: auto; }
 
+/* Sentence builder + dictation prompt */
+.prompt-ru { font-size: 1.25rem; font-weight: 600; margin: 0.3rem 0 1rem; line-height: 1.4; }
+.prompt-listen { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.3rem 0 1.2rem; }
+.sent-line {
+  display: flex; flex-wrap: wrap; gap: 0.4rem;
+  min-height: 2.6rem; align-items: center;
+  padding: 0.5rem; margin-bottom: 0.8rem;
+  border: 1px dashed var(--border); border-radius: var(--radius);
+}
+.sent-placeholder { color: var(--muted); font-size: 0.9rem; }
+.sent-bank { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+.sent-chip {
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  border-radius: 8px; padding: 0.45rem 0.8rem; font-size: 1.05rem; cursor: pointer;
+}
+.sent-chip:hover:not(:disabled) { border-color: var(--accent); }
+.sent-chip.placed { background: var(--accent-soft); border-color: var(--accent); }
+.sent-chip:disabled { cursor: default; }
+
 /* Embedded pronunciation */
 .say-btn {
   border: none;

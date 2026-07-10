@@ -1,6 +1,9 @@
-// Deterministic Kyrgyz noun morphology: vowel harmony + consonant assimilation.
+// Deterministic Kyrgyz morphology: vowel harmony + consonant assimilation.
 // Implements exactly the rules taught in the course lessons (step-01 синхармонизм,
-// step-03/04 cases), so drills always agree with the taught material.
+// step-03/04 noun cases, step-02/04/05 verb tenses), so drills always agree with the
+// taught material. Verb forms here are 3rd-person singular of regular consonant-final
+// stems (the curated DRILL_VERBS); irregular verbs are excluded.
+// ⚠️ Verb forms are model-authored — worth a native-speaker spot-check.
 
 const BACK_UNROUNDED = 'аы';
 const FRONT_UNROUNDED = 'еэи';
@@ -26,6 +29,16 @@ function lowVowel(word: string): 'а' | 'е' | 'о' | 'ө' {
   if (v === 'о') return 'о';
   if (FRONT_UNROUNDED.includes(v)) return 'е';
   return 'а'; // а, ы, у
+}
+
+/** Suffix vowel for high-vowel (и-type) suffixes: -ды (прош.), -ып (деепричастие). */
+function highVowel(word: string): 'ы' | 'и' | 'у' | 'ү' {
+  const v = lastVowel(word);
+  if (v === null) return 'ы';
+  if (FRONT_ROUNDED.includes(v)) return 'ү';
+  if (BACK_ROUNDED_O.includes(v) || BACK_ROUNDED_U.includes(v)) return 'у';
+  if (FRONT_UNROUNDED.includes(v)) return 'и';
+  return 'ы'; // а, ы
 }
 
 const endsVoiceless = (word: string) => VOICELESS.includes(word[word.length - 1]?.toLowerCase() ?? '');
@@ -57,6 +70,28 @@ export function ablative(word: string): string {
   return `${word}${endsVoiceless(word) ? 'т' : 'д'}${lowVowel(word)}н`;
 }
 
+// --- Глагол, 3-е лицо ед. числа (регулярные основы на согласную). ---
+
+/** Настоящее время (сейчас): деепричастие -ып + жатат. бар → барып жатат. */
+export function presentCont(verb: string): string {
+  return `${verb}${highVowel(verb)}п жатат`;
+}
+
+/** Прошедшее определённое: -ды/-ти. бар → барды, кет → кетти. */
+export function pastTense(verb: string): string {
+  return `${verb}${endsVoiceless(verb) ? 'т' : 'д'}${highVowel(verb)}`;
+}
+
+/** Настоящее-будущее (аорист): -ат. бар → барат, кел → келет. */
+export function futureAorist(verb: string): string {
+  return `${verb}${lowVowel(verb)}т`;
+}
+
+/** Отрицание аориста: -байт/-пайт. бар → барбайт, кет → кетпейт. */
+export function negAorist(verb: string): string {
+  return `${verb}${endsVoiceless(verb) ? 'п' : 'б'}${lowVowel(verb)}йт`;
+}
+
 export interface Drill {
   /** e.g. "Множественное число" */
   task: string;
@@ -70,20 +105,31 @@ interface DrillType {
   task: string;
   hint: string;
   make: (w: string) => string;
+  /** Word pool this drill inflects (nouns for cases, verbs for tenses). */
+  words: string[];
 }
-
-const DRILL_TYPES: DrillType[] = [
-  { task: 'Множественное число', hint: 'кыз → кыздар', make: plural },
-  { task: 'Где? (жатыш)', hint: 'үй → үйдө', make: locative },
-  { task: 'Куда? (барыш)', hint: 'үй → үйгө', make: dative },
-  { task: 'Откуда? (чыгыш)', hint: 'үй → үйдөн', make: ablative },
-];
 
 // Curated regular nouns from the course vocabulary. Irregulars (бала → балдар) excluded.
 export const DRILL_NOUNS = [
   'кыз', 'китеп', 'үй', 'көл', 'жол', 'тоо', 'шаар', 'мектеп', 'базар', 'куш',
   'ат', 'эже', 'дос', 'кол', 'көз', 'сөз', 'ай', 'күн', 'түн', 'тил',
   'нан', 'эт', 'токой', 'айыл', 'көчө', 'дүкөн', 'терезе', 'эшик', 'калем', 'гүл',
+];
+
+// Curated regular consonant-final verbs from the course vocabulary.
+export const DRILL_VERBS = [
+  'бар', 'кел', 'ал', 'бер', 'көр', 'кет', 'айт', 'жаз', 'тур', 'сат', 'ач', 'бил', 'ич',
+];
+
+const DRILL_TYPES: DrillType[] = [
+  { task: 'Множественное число', hint: 'кыз → кыздар', make: plural, words: DRILL_NOUNS },
+  { task: 'Где? (жатыш)', hint: 'үй → үйдө', make: locative, words: DRILL_NOUNS },
+  { task: 'Куда? (барыш)', hint: 'үй → үйгө', make: dative, words: DRILL_NOUNS },
+  { task: 'Откуда? (чыгыш)', hint: 'үй → үйдөн', make: ablative, words: DRILL_NOUNS },
+  { task: 'Настоящее (-ып жатат)', hint: 'бар → барып жатат', make: presentCont, words: DRILL_VERBS },
+  { task: 'Прошедшее (-ды)', hint: 'кел → келди', make: pastTense, words: DRILL_VERBS },
+  { task: 'Будущее (-ат)', hint: 'бар → барат', make: futureAorist, words: DRILL_VERBS },
+  { task: 'Отрицание (-байт)', hint: 'кел → келбейт', make: negAorist, words: DRILL_VERBS },
 ];
 
 /** Task names accepted by the `tasks` filter of buildDrills. */
@@ -103,14 +149,15 @@ export function buildDrills(count: number, seed: number, tasks?: string[]): Dril
     x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
     return Math.abs(x);
   };
+  const capacity = types.reduce((n, t) => n + t.words.length, 0);
   const used = new Set<string>();
-  while (drills.length < count && used.size < DRILL_NOUNS.length * types.length) {
-    const noun = DRILL_NOUNS[next() % DRILL_NOUNS.length];
+  while (drills.length < count && used.size < capacity) {
     const type = types[next() % types.length];
-    const key = `${noun}|${type.task}`;
+    const word = type.words[next() % type.words.length];
+    const key = `${word}|${type.task}`;
     if (used.has(key)) continue;
     used.add(key);
-    drills.push({ task: type.task, word: noun, answer: type.make(noun), hint: type.hint });
+    drills.push({ task: type.task, word, answer: type.make(word), hint: type.hint });
   }
   return drills;
 }

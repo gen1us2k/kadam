@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import StudySession from './StudySession';
 import Drills from './Drills';
 import Reader from './Reader';
+import SentenceBuild from './SentenceBuild';
+import StepExam from './StepExam';
 import { deckStats, loadStore } from '../lib/srs';
 import type { DeckCard, DeckStats } from '../lib/srs';
 import type { JourneyStep } from '../lib/journey';
@@ -41,6 +43,8 @@ const ICON: Record<JourneyStep['type'], string> = {
   drill: '✏️',
   reader: '📰',
   phrases: '💬',
+  sentence: '🧩',
+  exam: '🎯',
 };
 
 const domId = (s: JourneyStep) => `jstep-${s.id.replace(/:/g, '-')}`;
@@ -148,6 +152,8 @@ export default function Journey({ steps, deck }: Props) {
                   )}
                   {s.type === 'drill' && <Drills types={s.drillTasks} />}
                   {s.type === 'reader' && s.text && <Reader deck={deck} initialText={s.text} autoParse />}
+                  {s.type === 'sentence' && <SentenceBuild tag={s.tag} />}
+                  {s.type === 'exam' && s.tag && <StepExam deck={deck} tag={s.tag} drillTasks={s.drillTasks} />}
 
                   <div className="jstep-nav">
                     <button className="btn ghost" onClick={() => goTo(i - 1)} disabled={i === 0}>← Предыдущий</button>

@@ -20,6 +20,11 @@ export function todayStr(now = new Date()): string {
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
+/** Deterministic per-day seed: everyone gets the same daily drill/sentence set. */
+export function daySeed(now = new Date()): number {
+  return now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+}
+
 function prevDayStr(day: string): string {
   const d = new Date(`${day}T12:00:00`);
   d.setDate(d.getDate() - 1);

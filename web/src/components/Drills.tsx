@@ -1,16 +1,10 @@
 import { useMemo, useRef, useState } from 'react';
 import { buildDrills } from '../lib/morphology';
-import { recordAnswer } from '../lib/daily';
+import { daySeed, recordAnswer } from '../lib/daily';
 import SpeakButton from './SpeakButton';
 
 const KG_LETTERS = ['ң', 'ө', 'ү'];
 const norm = (s: string) => s.toLowerCase().trim();
-
-/** Deterministic per-day seed so everyone gets the same daily drill set. */
-function daySeed(): number {
-  const d = new Date();
-  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
-}
 
 export default function Drills({ count = 6, types }: { count?: number; types?: string[] }) {
   const drills = useMemo(() => buildDrills(count, daySeed(), types), [count, types]);

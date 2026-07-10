@@ -1,6 +1,8 @@
 import type { DeckCard } from './srs';
+import { SENTENCES } from './sentences';
 
-export type StepType = 'grammar' | 'vocab' | 'review' | 'corpus' | 'drill' | 'reader' | 'phrases';
+export type StepType =
+  | 'grammar' | 'vocab' | 'review' | 'corpus' | 'drill' | 'reader' | 'phrases' | 'sentence' | 'exam';
 
 // Frequency-corpus stations, woven into the path at level-appropriate points. Each drills the
 // CEFR band of the B2 corpus (filtered by its level tag) via the same SRS study session.
@@ -11,11 +13,18 @@ const CORPUS_AFTER: Record<string, { level: string; label: string }> = {
   'step-08': { level: 'b2', label: 'B2' },
 };
 
-// Morphology-drill stations: active production of the suffixes just taught.
+// Morphology-drill stations: active production of the suffixes/tenses just taught.
 const DRILL_AFTER: Record<string, { tasks: string[]; title: string }> = {
   'step-02': { tasks: ['Множественное число'], title: 'Дриллы: множественное число' },
   'step-03': { tasks: ['Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'], title: 'Дриллы: падежи места' },
   'step-04': { tasks: ['Множественное число', 'Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'], title: 'Дриллы: все суффиксы' },
+  'step-05': { tasks: ['Настоящее (-ып жатат)', 'Прошедшее (-ды)', 'Будущее (-ат)', 'Отрицание (-байт)'], title: 'Дриллы: глагольные времена' },
+};
+
+// Milestone self-tests: mixed vocab + grammar with a pass threshold, at review points.
+const EXAM_AFTER: Record<string, { tasks: string[] }> = {
+  'step-04': { tasks: ['Множественное число', 'Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'] },
+  'step-08': { tasks: ['Прошедшее (-ды)', 'Будущее (-ат)', 'Множественное число', 'Где? (жатыш)'] },
 };
 
 // Graded reading steps for the activation part — course-vocabulary texts, click-translate.
@@ -46,10 +55,10 @@ export interface JourneyStep {
   subtitle?: string;
   /** For grammar/phrases steps: content pre-rendered to HTML. */
   html?: string;
-  /** Deck-filter tag: a step tag (e.g. "step03") for vocab, or a CEFR level for corpus. */
+  /** Deck-filter tag: a step tag (e.g. "step03") for vocab/sentence/exam, or a CEFR level for corpus. */
   tag?: string;
   wordCount?: number;
-  /** For drill steps: morphology task filter. */
+  /** For drill and exam steps: morphology task filter. */
   drillTasks?: string[];
   /** For reader steps: the graded text. */
   text?: string;
@@ -114,6 +123,17 @@ export function buildJourney(parts: StepLessons[], deck: DeckCard[], extras: Jou
       });
     }
 
+    const sentCount = SENTENCES.filter((s) => s.tag === tag).length;
+    if (sentCount > 0) {
+      steps.push({
+        id: `s:${tag}`,
+        type: 'sentence',
+        title: 'Собери предложение',
+        subtitle: `${sentCount} фраз · порядок SOV`,
+        tag,
+      });
+    }
+
     const drill = DRILL_AFTER[part.slug];
     if (drill) {
       steps.push({
@@ -148,6 +168,18 @@ export function buildJourney(parts: StepLessons[], deck: DeckCard[], extras: Jou
         title: reader.title,
         subtitle: 'Кликайте по словам — словарь подскажет',
         text: reader.text,
+      });
+    }
+
+    const exam = EXAM_AFTER[part.slug];
+    if (exam) {
+      steps.push({
+        id: `e:${part.slug}`,
+        type: 'exam',
+        title: `Экзамен-веха: шаг ${Number(part.slug.slice(5))}`,
+        subtitle: 'Смешанный мини-тест · порог 80%',
+        tag,
+        drillTasks: exam.tasks,
       });
     }
   }
