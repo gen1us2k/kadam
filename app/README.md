@@ -14,9 +14,10 @@
 
 ```bash
 npm install
-npm run dev       # http://localhost:4321
+npm run serve     # собрать dist и поднять сервер: http://localhost:4321 (сайт + API)
+npm run dev       # http://localhost:4322 — HMR (нужен запущенный сервер для /api)
 npm run build     # статическая сборка в ./dist
-npm run preview   # предпросмотр ./dist
+npm test          # серверные (ctc/static/tts) + клиентские проверки
 ```
 
 ## Структура

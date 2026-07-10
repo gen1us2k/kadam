@@ -4,7 +4,7 @@
 // requested by text (TTS); the ~338 MB ASR and ~114 MB TTS ONNX models run here, not in the
 // browser. CTC math lives in ctc.ts, locked to the reference fixture by test-ctc.ts.
 //
-// Run (from app/):  npm install && npm run serve      # builds dist, listens on :8000
+// Run (from app/):  npm install && npm run serve      # builds dist, listens on :4321
 // Model files come from app/models/ — ASR: scripts/export-asr.py; TTS: models/tts/ (see README).
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -259,7 +259,7 @@ const server = createServer(async (req, res) => {
 try {
   if (!(await stat(`${STATIC_DIR}/index.html`)).isFile()) throw new Error();
 } catch {
-  console.warn(`[warn] ${STATIC_DIR}/index.html not found — run \`cd web && npm run build\` to serve the app`);
+  console.warn(`[warn] ${STATIC_DIR}/index.html not found — run \`npm run build\` to serve the app`);
 }
 
 server.listen(PORT, () => console.log(`kyrgyz app on http://localhost:${PORT}  (api + dist, models: ${MODELS_DIR})`));

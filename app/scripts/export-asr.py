@@ -8,7 +8,7 @@ The model weights are gitignored (~338 MB > GitHub's 100 MB limit), so regenerat
     python scripts/export-asr.py
 
 Writes models/{model.onnx, vocab.json, asr-meta.json} — consumed by server/main.ts
-(the browser no longer loads the model; see web/src/lib/asr.ts). NOTE: quantize MatMul ONLY —
+(the browser no longer loads the model; see src/lib/asr.ts). NOTE: quantize MatMul ONLY —
 dynamic-quantizing the conv feature extractor emits ConvInteger, which onnxruntime-web's wasm
 backend does not implement (kept for potential in-browser fallback; convs stay fp32 and the
 transformer MatMuls hold most of the weight anyway).

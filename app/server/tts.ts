@@ -1,6 +1,6 @@
 // Pure TTS helpers for the Meta MMS (facebook/mms-tts-kir) frontend — no I/O, unit-tested in
 // test-tts.ts. main.ts wires tokenize() to the onnxruntime-node session and encodeWav() to the
-// HTTP response. Ported verbatim from the former in-browser web/src/lib/tts.ts.
+// HTTP response. Ported verbatim from the former in-browser src/lib/tts.ts.
 
 /** Parse the MMS tokens.txt ("<char> <id>"; the space char itself is a token: "  <id>"). */
 export function parseTokens(text: string): Map<string, number> {

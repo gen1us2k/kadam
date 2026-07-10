@@ -1,6 +1,6 @@
 // Regression guard for the browser audio utilities (audio.ts): silence trim + WAV encoding.
 // Run: `npm test` (needs Node >=23 for direct .ts execution).
-// CTC math parity moved server-side with the model: server/test_ctc.py locks server/ctc.py to
+// CTC math parity moved server-side with the model: server/test-ctc.ts locks server/ctc.ts to
 // the same reference fixture (scripts/ctc-fixture.json).
 
 import { trimSilence, encodeWav } from '../src/lib/audio.ts';

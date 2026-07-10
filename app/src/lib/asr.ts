@@ -3,7 +3,7 @@
 // the recorded utterance as a small 16 kHz mono WAV (~64 KB per phrase, raw POST body) and get
 // back the same Analysis the in-browser pipeline produced. CTC math (greedy decode + Viterbi
 // forced-alignment GOP) runs server-side, locked to the shared reference fixture
-// (web/scripts/ctc-fixture.json <-> server/test-ctc.ts).
+// (scripts/ctc-fixture.json <-> server/test-ctc.ts).
 
 import { encodeWav } from './audio';
 
