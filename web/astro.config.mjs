@@ -15,6 +15,9 @@ export default defineConfig({
   vite: {
     // Allow reading the source-of-truth CSV/markdown from the repo root (above web/).
     server: { fs: { allow: ['..'] }, allowedHosts: ['localhost', 'xerox-handclap-baggie.ngrok-free.dev'] },
+    // Don't prebundle onnxruntime-web: its wasm must stay next to the served module,
+    // otherwise dev requests /node_modules/.vite/deps/*.wasm and 404s.
+    optimizeDeps: { exclude: ['onnxruntime-web'] },
   },
 
   integrations: [react()],
