@@ -17,6 +17,13 @@ import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
 import { CONTENT_TYPES, cacheControl, resolveStatic, weakEtag } from './static.ts';
 import { parseTokens, tokenize, encodeWav } from './tts.ts';
 
+// Optional app/.env for PORT / MODELS_DIR / STATIC_DIR (see .env.example). Real env vars win.
+try {
+  process.loadEnvFile(fileURLToPath(new URL('../.env', import.meta.url)));
+} catch {
+  /* no .env — defaults / real env vars apply */
+}
+
 const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('../models', import.meta.url));
 // The built app (astro build -> dist) is served from the same port as /api.
 const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL('../dist', import.meta.url));

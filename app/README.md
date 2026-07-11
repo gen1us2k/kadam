@@ -127,15 +127,28 @@ node:http + onnxruntime-node, iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8)
 
 ```
 npm install
-npm run serve        # собирает dist и стартует сервер: http://localhost:4321 — сайт + API
+npm run fetch-models   # скачивает веса моделей (см. ниже) — один раз
+npm run serve          # собирает dist и стартует сервер: http://localhost:4321 — сайт + API
 ```
 
 Для разработки — `npm run dev` (:4322 с HMR); он проксирует `/api` на сервер :4321, так что
 сервер (`npm start`) тоже должен быть запущен. `npm test` гоняет серверные (ctc/static/tts) и клиентские
-проверки; `npm run typecheck` — оба tsconfig. Веса модели гитигнорены (>100 МБ); регенерация ASR:
+проверки; `npm run typecheck` — оба tsconfig.
 
-```
-python3 -m venv .venv && source .venv/bin/activate
-pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
-python scripts/export-asr.py   # пишет models/{model.onnx, vocab.json, asr-meta.json}
-```
+### Веса моделей
+
+Веса (~450 МБ) гитигнорены. `npm run fetch-models` кладёт их в `models/`:
+- **TTS** — готовый ONNX качается напрямую с HuggingFace (willwade/mms-tts-multilingual-models-onnx).
+- **ASR** — публичного int8-ONNX нет, поэтому генерируется локально из HF-чекпоинта
+  (`scripts/export-asr.py`): скрипт сам создаёт `.venv`, ставит torch и экспортирует (медленно,
+  один раз). `-- --force` пере-скачивает/пере-генерирует всё.
+
+### Конфигурация
+
+Пути и порт настраиваются через env (реальные env-переменные приоритетнее). Скопируйте
+[`.env.example`](.env.example) в `.env` — его читают и `server/main.ts`, и `fetch-models.sh`:
+
+- `PORT` — порт сервера (по умолчанию 4321).
+- `MODELS_DIR` — папка с весами (по умолчанию `<app>/models`; можно указать абсолютный путь,
+  чтобы держать ~450 МБ вне репозитория).
+- `STATIC_DIR` — папка собранного сайта (по умолчанию `<app>/dist`).

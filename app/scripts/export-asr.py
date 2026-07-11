@@ -22,7 +22,8 @@ from onnxruntime.quantization import QuantType, quantize_dynamic
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
 MODEL = "iarfmoose/wav2vec2-large-xlsr-kyrgyz"
-OUT = os.path.join(os.path.dirname(__file__), "..", "models")
+# MODELS_DIR env (same knob the server + fetch-models.sh use); default: <app>/models.
+OUT = os.environ.get("MODELS_DIR") or os.path.join(os.path.dirname(__file__), "..", "models")
 FP32 = os.path.join(OUT, "model.fp32.onnx")
 INT8 = os.path.join(OUT, "model.onnx")
 
