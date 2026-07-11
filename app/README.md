@@ -120,6 +120,8 @@ node:http + onnxruntime-node, iarfmoose/wav2vec2-large-xlsr-kyrgyz в ONNX int8)
 транскрипта. CTC-математика — `server/ctc.ts`, залочена на эталонную фикстуру
 (`scripts/ctc-fixture.json` ↔ `server/test-ctc.ts`).
 
+Контракт эндпоинтов (`/api/asr/analyze`, `/api/tts`, `/api/health`) — [`server/API.md`](server/API.md).
+
 Фронтенд (`src/`, Astro) и бэкенд (`server/`, node:http + onnxruntime-node) — **один проект**
 с одним `package.json`. Запуск (один порт 4321, Node ≥23):
 
