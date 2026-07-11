@@ -2,6 +2,7 @@
 """Export iarfmoose/wav2vec2-large-xlsr-kyrgyz (Wav2Vec2ForCTC) to ONNX int8 for the ASR backend.
 
 The model weights are gitignored (~338 MB > GitHub's 100 MB limit), so regenerate them here.
+Normally invoked via `npm run fetch-models` (scripts/fetch-models.sh sets up the venv). Manual:
 
     python3 -m venv .venv && source .venv/bin/activate
     pip install "torch==2.8.0" "transformers==4.57.6" "onnx==1.19.1" "onnxruntime==1.19.2"
