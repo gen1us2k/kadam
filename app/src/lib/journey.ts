@@ -141,7 +141,7 @@ export function buildJourney(parts: StepLessons[], deck: DeckCard[], extras: Jou
         id: `s:${tag}`,
         type: 'sentence',
         title: 'Собери предложение',
-        subtitle: `${sentCount} фраз · порядок SOV`,
+        subtitle: `${sentCount} фраз · порядок SOV · произношение`,
         tag,
       });
     }
