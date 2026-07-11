@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Recorder } from '../lib/audio';
+import type { AutoStopReason } from '../lib/audio';
 import { analyze } from '../lib/asr';
 import type { AsrStatus, Analysis } from '../lib/asr';
 
@@ -50,12 +51,25 @@ export default function SpeakPractice({
   const busy = status !== null && status !== 'done' && status !== 'error';
   const finished = result !== null;
 
+  // Voice-activity auto-stop: no speech → discard + prompt; speech ended / max length → recognize.
+  function handleAutoStop(reason: AutoStopReason) {
+    if (!recorderRef.current) return;
+    if (reason === 'nospeech') {
+      recorderRef.current.cancel();
+      recorderRef.current = null;
+      setRecording(false);
+      setError('Не слышно голоса — говорите ближе к микрофону и попробуйте ещё раз.');
+    } else {
+      stopRec(); // speech ended (or hit the length cap) → recognize
+    }
+  }
+
   async function startRec() {
     setError(null);
     setStatus(null); // clear a stale error hint from a prior attempt
     try {
       const rec = new Recorder();
-      await rec.start();
+      await rec.start({ onAutoStop: handleAutoStop });
       recorderRef.current = rec;
       setRecording(true);
     } catch {
@@ -92,6 +106,7 @@ export default function SpeakPractice({
           {recording ? '⏹ Остановить' : '🎤 Сказать'}
         </button>
       )}
+      {recording && <span className="study-meta">🎙 говорите… (остановится сама)</span>}
       {status && STATUS_LABEL[status] ? <span className="study-meta">{STATUS_LABEL[status]}</span> : null}
       {error && <span className="study-meta">{error}</span>}
 

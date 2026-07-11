@@ -1,15 +1,45 @@
-// Microphone capture for the speech PoC. Records via MediaRecorder, then decodes and
-// resamples to 16 kHz mono Float32 — the input format wav2vec2 expects.
+// Microphone capture for the speech features. Records via MediaRecorder, then decodes and
+// resamples to 16 kHz mono Float32 — the input format wav2vec2 expects. An optional voice-activity
+// detector auto-stops the recording (no speech, or speech that has ended).
 
 const TARGET_RATE = 16000;
+
+/** Why the recorder auto-stopped: no one spoke, or speech ended / hit the length cap. */
+export type AutoStopReason = 'nospeech' | 'silence' | 'maxlen';
+
+interface StartOptions {
+  /** Fired once when voice-activity detection decides the recording should stop. */
+  onAutoStop?: (reason: AutoStopReason) => void;
+}
+
+// --- VAD tuning (RMS of the mic signal; speech ≈ 0.05–0.2, quiet room < 0.01) ---
+const VAD_SPEECH_RMS = 0.02; // above this counts as voice
+const VAD_ONSET_MS = 120; // sustained voice before we consider speech "started" (debounces clicks)
+const VAD_NO_SPEECH_MS = 3000; // silence from the start with no speech → 'nospeech'
+const VAD_TRAILING_MS = 900; // silence after speech → 'silence' (endpoint)
+const VAD_MAX_MS = 10000; // hard cap on one utterance
+
+/**
+ * Pure auto-stop decision from the current timings — returns the stop reason, or null to keep
+ * recording. Extracted so the state machine can be unit-tested without the browser audio graph.
+ */
+export function vadDecision(p: { elapsedMs: number; sinceVoiceMs: number; speechStarted: boolean }): AutoStopReason | null {
+  if (p.elapsedMs > VAD_MAX_MS) return p.speechStarted ? 'silence' : 'nospeech';
+  if (!p.speechStarted && p.elapsedMs > VAD_NO_SPEECH_MS) return 'nospeech';
+  if (p.speechStarted && p.sinceVoiceMs > VAD_TRAILING_MS) return 'silence';
+  return null;
+}
 
 export class Recorder {
   private media: MediaRecorder | null = null;
   private chunks: Blob[] = [];
   private stream: MediaStream | null = null;
+  private vadCtx: AudioContext | null = null;
+  private vadSource: MediaStreamAudioSourceNode | null = null;
+  private vadRaf: number | null = null;
 
   /** Request the mic and start recording. Throws if permission is denied. */
-  async start(): Promise<void> {
+  async start(opts: StartOptions = {}): Promise<void> {
     // Mono + browser cleanup (noise suppression / auto-gain) gives the recognizer cleaner input.
     this.stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -26,12 +56,82 @@ export class Recorder {
       if (e.data.size > 0) this.chunks.push(e.data);
     };
     this.media.start();
+    if (opts.onAutoStop) {
+      try {
+        this.startVad(opts.onAutoStop);
+      } catch {
+        // VAD unavailable (e.g. no Web Audio) — recording still works via the manual stop button.
+      }
+    }
+  }
+
+  /** Watch the mic level and fire onAutoStop once (no-speech, endpoint, or max length). */
+  private startVad(onAutoStop: (reason: AutoStopReason) => void): void {
+    if (!this.stream) return;
+    const ctx = new AudioContext();
+    const source = ctx.createMediaStreamSource(this.stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser); // not connected to destination — analysis only, no playback
+    this.vadCtx = ctx;
+    this.vadSource = source;
+
+    const buf = new Float32Array(analyser.fftSize);
+    const startMs = performance.now();
+    let prevMs = startMs;
+    let lastVoiceMs = startMs;
+    let voicedRun = 0;
+    let speechStarted = false;
+    let fired = false;
+
+    const fire = (reason: AutoStopReason) => {
+      if (fired) return;
+      fired = true;
+      this.stopVad();
+      onAutoStop(reason);
+    };
+
+    const tick = () => {
+      const now = performance.now();
+      const dt = now - prevMs;
+      prevMs = now;
+
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      const rms = Math.sqrt(sum / buf.length);
+
+      if (rms > VAD_SPEECH_RMS) {
+        lastVoiceMs = now;
+        voicedRun += dt;
+        if (voicedRun >= VAD_ONSET_MS) speechStarted = true;
+      } else {
+        voicedRun = 0;
+      }
+
+      const reason = vadDecision({ elapsedMs: now - startMs, sinceVoiceMs: now - lastVoiceMs, speechStarted });
+      if (reason) fire(reason);
+      else this.vadRaf = requestAnimationFrame(tick);
+    };
+    this.vadRaf = requestAnimationFrame(tick);
+  }
+
+  private stopVad(): void {
+    if (this.vadRaf != null) {
+      cancelAnimationFrame(this.vadRaf);
+      this.vadRaf = null;
+    }
+    this.vadSource?.disconnect();
+    this.vadSource = null;
+    this.vadCtx?.close().catch(() => {});
+    this.vadCtx = null;
   }
 
   /** Stop recording and return the captured audio as 16 kHz mono Float32. */
   async stop(): Promise<Float32Array> {
     const media = this.media;
     if (!media) throw new Error('recorder not started');
+    this.stopVad();
     const done = new Promise<void>((resolve) => {
       media.onstop = () => resolve();
     });
@@ -48,6 +148,7 @@ export class Recorder {
 
   /** Abort recording and release the mic without decoding (e.g. on unmount). */
   cancel(): void {
+    this.stopVad();
     if (this.media && this.media.state !== 'inactive') this.media.stop();
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;

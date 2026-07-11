@@ -3,7 +3,7 @@
 // CTC math parity moved server-side with the model: server/test-ctc.ts locks server/ctc.ts to
 // the same reference fixture (scripts/ctc-fixture.json).
 
-import { trimSilence, encodeWav } from '../src/lib/audio.ts';
+import { trimSilence, encodeWav, vadDecision } from '../src/lib/audio.ts';
 
 let fail = 0;
 const check = (name: string, cond: boolean, got?: unknown, want?: unknown) => {
@@ -47,6 +47,17 @@ check('zero sample', s(0) === 0);
 check('half sample ~16383', Math.abs(s(1) - Math.round(0.5 * 0x7fff)) <= 1, s(1));
 check('clip +1 -> 32767', s(3) === 0x7fff, s(3));
 check('clip -1 -> -32768', s(4) === -0x8000, s(4));
+
+// --- vadDecision (auto-stop state machine) ---
+const V = (elapsedMs: number, sinceVoiceMs: number, speechStarted: boolean) =>
+  vadDecision({ elapsedMs, sinceVoiceMs, speechStarted });
+check('early, no speech -> keep', V(500, 500, false) === null);
+check('no speech past 3s -> nospeech', V(3200, 3200, false) === 'nospeech');
+check('speaking, short pause -> keep', V(2000, 400, true) === null);
+check('speech then 0.9s+ silence -> endpoint', V(2000, 1000, true) === 'silence');
+check('speaking continuously -> keep', V(2000, 0, true) === null);
+check('max length with speech -> silence', V(11000, 200, true) === 'silence');
+check('max length no speech -> nospeech', V(11000, 11000, false) === 'nospeech');
 
 console.log(fail === 0 ? 'ALL TESTS PASSED' : `\n${fail} TEST(S) FAILED`);
 process.exit(fail === 0 ? 0 : 1);
