@@ -6,7 +6,9 @@ import {
 import type { CardState, DeckCard, Grade, Store } from '../lib/srs';
 import { loadDaily, recordAnswer } from '../lib/daily';
 import type { DailyState } from '../lib/daily';
+import { speak } from '../lib/tts';
 import SpeakButton from './SpeakButton';
+import SpeakPractice from './SpeakPractice';
 
 interface Props {
   /** Full vocabulary deck (also used to draw distractor options). */
@@ -18,9 +20,12 @@ interface Props {
 /**
  * Card mode ladder (recognition → production):
  * new cards — multiple choice KG→RU; young — multiple choice RU→KG;
- * mature — rotates dictation (listen → type), cloze (when an example exists) and typed RU→KG.
+ * mature — rotates dictation (listen → type), cloze, speaking (say it aloud) and typed RU→KG.
  */
-type Mode = 'mc' | 'mcrev' | 'typed' | 'cloze' | 'listen';
+type Mode = 'mc' | 'mcrev' | 'typed' | 'cloze' | 'listen' | 'speak';
+
+/** Pronunciation pass threshold (mean per-letter GOP, 0..1) for a mature spoken card. */
+const SPEAK_PASS = 0.5;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -57,10 +62,11 @@ function modeFor(card: DeckCard, store: Store): Mode {
   const st = store[cardId(card)];
   if (!st || st.reps < 2) return 'mc';
   if (st.s < 7) return 'mcrev';
-  // Mature: rotate dictation / cloze / typed for varied production + listening practice.
-  const slot = st.reps % 3;
+  // Mature: rotate dictation / cloze / speaking / typed for varied production practice.
+  const slot = st.reps % 4;
   if (slot === 0) return 'listen';
-  if (slot === 1 && clozeToken(card)) return 'cloze';
+  if (slot === 1) return clozeToken(card) ? 'cloze' : 'typed';
+  if (slot === 2) return 'speak';
   return 'typed';
 }
 
@@ -154,6 +160,38 @@ export default function StudySession({ deck, tag }: Props) {
     });
   }
 
+  const isChoice = mode === 'mc' || mode === 'mcrev';
+
+  // Keyboard: number keys pick MC options; after answering, Enter/Space advance and 1/2 regrade;
+  // Alt+R replays the word's audio. Typing keys are left to the focused input.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.altKey && (e.key === 'r' || e.key === 'к')) {
+        if (card) { e.preventDefault(); speak(card.kg).catch(() => {}); }
+        return;
+      }
+      const inInput = (document.activeElement as HTMLElement | null)?.tagName === 'INPUT';
+      if (inInput) return; // the focused input owns typing + Enter-to-submit
+      if (!answered) {
+        if (isChoice) {
+          const n = Number(e.key);
+          if (n >= 1 && n <= options.length) {
+            e.preventDefault();
+            const right = mode === 'mc' ? card!.ru : card!.kg;
+            commit(options[n - 1] === right, options[n - 1]);
+          }
+        }
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); }
+      else if (answered.correct && e.key === '1') { e.preventDefault(); regradeAndNext(2); }
+      else if (answered.correct && e.key === '2') { e.preventDefault(); regradeAndNext(4); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- closures read fresh state each render
+  }, [answered, card, mode, isChoice, options]);
+
   if (!ready) return <p className="study-meta">Загрузка…</p>;
 
   const stats = deckStats(deck, storeRef.current, Date.now(), tag);
@@ -169,22 +207,27 @@ export default function StudySession({ deck, tag }: Props) {
   }
 
   if (index >= queue.length) {
+    const pct = score.total ? Math.round((score.correct / score.total) * 100) : 0;
     return (
       <div className="study-summary">
         <h2>Готово!</h2>
-        <p>Правильно {score.correct} из {score.total}.</p>
-        <p className="study-meta">{dailyLine} · Изучено {stats.seen} из {stats.total}.</p>
+        <ul className="recap">
+          <li><span>Правильно</span><b>{score.correct} / {score.total} ({pct}%)</b></li>
+          <li><span>Удержано слов</span><b>{stats.retained} / {stats.total}</b></li>
+          {daily && <li><span>Дневная цель</span><b>{daily.done}/{daily.goal}{daily.streak ? ` · 🔥 ${daily.streak}` : ''}</b></li>}
+          {stats.leeches > 0 && <li><span>Трудные («пиявки»)</span><b>{stats.leeches} — разобрать отдельно</b></li>}
+        </ul>
         <button className="btn" onClick={restart}>Ещё круг</button>
       </div>
     );
   }
 
-  const isChoice = mode === 'mc' || mode === 'mcrev';
   const promptLabel =
     mode === 'mc' ? 'Переведите на русский:'
     : mode === 'mcrev' ? 'Как это по-кыргызски?'
     : mode === 'typed' ? 'Напишите по-кыргызски:'
     : mode === 'listen' ? 'Прослушайте и впишите по-кыргызски:'
+    : mode === 'speak' ? 'Произнесите по-кыргызски:'
     : 'Впишите пропущенное слово:';
   const promptText =
     mode === 'mc' ? card.kg
@@ -203,13 +246,16 @@ export default function StudySession({ deck, tag }: Props) {
             <span className="study-meta">Нажмите 🔊 и запишите, что услышали</span>
           </div>
         ) : (
-          <div className={mode === 'cloze' ? 'prompt-cloze' : 'prompt-kg'}>{promptText}</div>
+          <div className={mode === 'cloze' ? 'prompt-cloze' : 'prompt-kg'}>
+            {promptText}
+            {mode === 'speak' && <> <SpeakButton text={card.kg} title="Послушать образец" /></>}
+          </div>
         )}
         {mode === 'cloze' && <div className="study-meta">Подсказка: {card.ru}</div>}
 
         {isChoice && (
           <div className="choices">
-            {options.map((opt) => {
+            {options.map((opt, i) => {
               const rightOpt = mode === 'mc' ? card.ru : card.kg;
               let cls = 'choice';
               if (answered) {
@@ -218,14 +264,27 @@ export default function StudySession({ deck, tag }: Props) {
               }
               return (
                 <button key={opt} className={cls} onClick={() => commit(opt === rightOpt, opt)} disabled={!!answered}>
-                  {opt}
+                  <span className="choice-key">{i + 1}</span> {opt}
                 </button>
               );
             })}
           </div>
         )}
 
-        {!isChoice && (
+        {mode === 'speak' && (
+          <div>
+            {!answered && (
+              <SpeakPractice key={cardId(card)} target={card.kg} onResult={(a) => commit(a.percent >= SPEAK_PASS * 100)} />
+            )}
+            {!answered && (
+              <button className="btn ghost" onClick={() => commit(true)} title="Пропустить произношение">
+                не сейчас
+              </button>
+            )}
+          </div>
+        )}
+
+        {(mode === 'typed' || mode === 'cloze' || mode === 'listen') && (
           <div className="typed">
             <input
               ref={inputRef}
@@ -285,6 +344,11 @@ export default function StudySession({ deck, tag }: Props) {
             )}
           </div>
         )}
+        <div className="kbd-hints">
+          {isChoice && !answered && <><kbd>1</kbd>–<kbd>4</kbd> выбор · </>}
+          {answered && <><kbd>Enter</kbd> далее · {answered.correct && <><kbd>1</kbd> тяжело <kbd>2</kbd> легко · </>}</>}
+          <kbd>Alt</kbd>+<kbd>R</kbd> прослушать
+        </div>
       </div>
     </div>
   );

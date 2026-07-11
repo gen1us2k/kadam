@@ -407,6 +407,37 @@ tr[hidden] { display: none; }
   padding: 0.9rem 1.1rem;
   margin: 1.2rem 0;
 }
+.home-status.first-run { border-style: dashed; }
+
+/* Daily-goal ring */
+.goal-ring { position: relative; display: inline-flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+.goal-ring svg { display: block; }
+.goal-ring-track { fill: none; stroke: var(--border); stroke-width: 5; }
+.goal-ring-fill { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.3s ease; }
+.goal-ring-fill.met { stroke: #1a7f37; }
+.goal-ring-label { position: absolute; top: 16px; font-size: 0.8rem; font-weight: 700; }
+.goal-ring-streak { font-size: 0.75rem; color: var(--muted); margin-top: 0.1rem; }
+
+/* Speaking practice (in-session pronunciation check) */
+.speak-practice { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin: 0.6rem 0; }
+.speak-letters { font-size: 1.7rem; letter-spacing: 0.02em; }
+.speak-score { font-size: 1.6rem; font-weight: 700; }
+
+/* Session summary recap */
+.recap { list-style: none; margin: 0.6rem 0; padding: 0; }
+.recap li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border); }
+.recap li:last-child { border-bottom: none; }
+
+/* Exam-readiness badge */
+.exam-ready { display: inline-block; border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 0.85rem; border: 1px solid var(--border); margin-bottom: 0.7rem; }
+.exam-ready.ok { color: #1a7f37; border-color: #1a7f37; }
+.exam-ready.low { color: var(--accent); border-color: var(--accent); }
+
+.choice-key { display: inline-block; min-width: 1.2em; color: var(--muted); font-size: 0.8em; font-weight: 700; }
+
+/* Keyboard hints */
+.kbd-hints { color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; }
+.kbd-hints kbd { border: 1px solid var(--border); border-radius: 4px; padding: 0 0.3rem; font-size: 0.85em; background: var(--surface); }
 
 /* Journey map */
 .journey { max-width: 760px; }

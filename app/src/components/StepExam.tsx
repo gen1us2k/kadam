@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { deckStats, loadStore } from '../lib/srs';
 import type { DeckCard } from '../lib/srs';
 import { buildDrills } from '../lib/morphology';
 import { daySeed, recordAnswer } from '../lib/daily';
@@ -101,6 +102,13 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
   const [score, setScore] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Readiness: how much of this step's vocabulary is actually retained before attempting the test.
+  const ready = useMemo(() => {
+    const s = deckStats(deck, loadStore(), Date.now(), tag);
+    const frac = s.total > 0 ? s.retained / s.total : 0;
+    return { retained: s.retained, total: s.total, frac, ok: frac >= 0.5 };
+  }, [deck, tag]);
+
   const finished = questions.length > 0 && index >= questions.length;
   const passedNow = finished && score / questions.length >= pass;
   useEffect(() => {
@@ -176,6 +184,12 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
 
   return (
     <div className="study">
+      {ready.total > 0 && (
+        <div className={`exam-ready ${ready.ok ? 'ok' : 'low'}`} title="Слова шага, реально удержанные в памяти (FSRS)">
+          Готовность: {Math.round(ready.frac * 100)}% ({ready.retained}/{ready.total} слов)
+          {!ready.ok && ' — стоит сперва повторить слова шага'}
+        </div>
+      )}
       <div className="study-progress">Вопрос {index + 1} / {questions.length} · счёт {score}</div>
       <div className="study-card">
         <div className="prompt-label">{isMc ? 'Выберите перевод:' : q.label}</div>
