@@ -45,7 +45,7 @@ const endsVoiceless = (word: string) => VOICELESS.includes(word[word.length - 1]
 const endsVowel = (word: string) => VOWELS.includes(word[word.length - 1]?.toLowerCase() ?? '');
 
 /** Множественное число: -лар/-дар/-тар × 4 гласных. */
-export function plural(word: string): string {
+function plural(word: string): string {
   const v = lowVowel(word);
   const last = word[word.length - 1]?.toLowerCase() ?? '';
   let c: string;
@@ -56,39 +56,39 @@ export function plural(word: string): string {
 }
 
 /** Жатыш (где): -да/-та × 4 гласных. */
-export function locative(word: string): string {
+function locative(word: string): string {
   return `${word}${endsVoiceless(word) ? 'т' : 'д'}${lowVowel(word)}`;
 }
 
 /** Барыш (куда): -га/-ка × 4 гласных. */
-export function dative(word: string): string {
+function dative(word: string): string {
   return `${word}${endsVoiceless(word) ? 'к' : 'г'}${lowVowel(word)}`;
 }
 
 /** Чыгыш (откуда): -дан/-тан × 4 гласных. */
-export function ablative(word: string): string {
+function ablative(word: string): string {
   return `${word}${endsVoiceless(word) ? 'т' : 'д'}${lowVowel(word)}н`;
 }
 
 // --- Глагол, 3-е лицо ед. числа (регулярные основы на согласную). ---
 
 /** Настоящее время (сейчас): деепричастие -ып + жатат. бар → барып жатат. */
-export function presentCont(verb: string): string {
+function presentCont(verb: string): string {
   return `${verb}${highVowel(verb)}п жатат`;
 }
 
 /** Прошедшее определённое: -ды/-ти. бар → барды, кет → кетти. */
-export function pastTense(verb: string): string {
+function pastTense(verb: string): string {
   return `${verb}${endsVoiceless(verb) ? 'т' : 'д'}${highVowel(verb)}`;
 }
 
 /** Настоящее-будущее (аорист): -ат. бар → барат, кел → келет. */
-export function futureAorist(verb: string): string {
+function futureAorist(verb: string): string {
   return `${verb}${lowVowel(verb)}т`;
 }
 
 /** Отрицание аориста: -байт/-пайт. бар → барбайт, кет → кетпейт. */
-export function negAorist(verb: string): string {
+function negAorist(verb: string): string {
   return `${verb}${endsVoiceless(verb) ? 'п' : 'б'}${lowVowel(verb)}йт`;
 }
 
@@ -110,14 +110,14 @@ interface DrillType {
 }
 
 // Curated regular nouns from the course vocabulary. Irregulars (бала → балдар) excluded.
-export const DRILL_NOUNS = [
+const DRILL_NOUNS = [
   'кыз', 'китеп', 'үй', 'көл', 'жол', 'тоо', 'шаар', 'мектеп', 'базар', 'куш',
   'ат', 'эже', 'дос', 'кол', 'көз', 'сөз', 'ай', 'күн', 'түн', 'тил',
   'нан', 'эт', 'токой', 'айыл', 'көчө', 'дүкөн', 'терезе', 'эшик', 'калем', 'гүл',
 ];
 
 // Curated regular consonant-final verbs from the course vocabulary.
-export const DRILL_VERBS = [
+const DRILL_VERBS = [
   'бар', 'кел', 'ал', 'бер', 'көр', 'кет', 'айт', 'жаз', 'тур', 'сат', 'ач', 'бил', 'ич',
 ];
 
@@ -133,7 +133,7 @@ const DRILL_TYPES: DrillType[] = [
 ];
 
 /** Task names accepted by the `tasks` filter of buildDrills. */
-export const DRILL_TASKS = DRILL_TYPES.map((t) => t.task);
+const DRILL_TASKS = DRILL_TYPES.map((t) => t.task);
 
 /**
  * Deterministic pseudo-random drill set for a given seed (e.g. day number).

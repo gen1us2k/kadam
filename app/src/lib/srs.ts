@@ -97,11 +97,6 @@ export function grade(prev: CardState | undefined, correct: boolean, now: number
   return gradeAnswer(prev, correct ? 3 : 1, now);
 }
 
-/** A card is due if it has never been seen or its scheduled time has passed. */
-export function isDue(state: CardState | undefined, now: number): boolean {
-  return !state || state.due <= now;
-}
-
 /** Deterministic-enough shuffle for study queues (client-side only). */
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];

@@ -10,7 +10,7 @@ export interface Lesson {
 // (No \b — JS word boundaries don't work after Cyrillic letters.)
 const DROP = /^(Лексика|Задания|Чеклист выхода)/i;
 
-export function cleanTitle(heading: string): string {
+function cleanTitle(heading: string): string {
   return heading
     .replace(/^\d+\.\s*/, '') // leading "3. "
     .replace(/\s*[—–-]\s*выучить в начале недели/i, '')
@@ -21,7 +21,7 @@ export function cleanTitle(heading: string): string {
 }
 
 // Internal doc links: removed pages become plain text; surviving pages get web routes.
-export function cleanLinks(md: string): string {
+function cleanLinks(md: string): string {
   return md
     .replace(/\[([^\]]+)\]\([^)]*grammar-cheatsheet\.md[^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*week-\d+[^)]*\)/g, '$1')

@@ -24,7 +24,7 @@ export interface DailyState {
 }
 
 const KEY = 'kyrgyz-daily-v1';
-export const DEFAULT_GOAL = 30;
+const DEFAULT_GOAL = 30;
 
 export function todayStr(now = new Date()): string {
   const p = (n: number) => String(n).padStart(2, '0');
