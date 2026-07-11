@@ -274,7 +274,12 @@ export default function StudySession({ deck, tag }: Props) {
         {mode === 'speak' && (
           <div>
             {/* Stays mounted after answering so the per-letter GOP result remains visible. */}
-            <SpeakPractice key={cardId(card)} target={card.kg} onResult={(a) => commit(a.percent >= SPEAK_PASS * 100)} />
+            <SpeakPractice
+              key={cardId(card)}
+              target={card.kg}
+              answered={!!answered}
+              onResult={(a) => commit(a.percent >= SPEAK_PASS * 100)}
+            />
             {!answered && (
               <button className="btn ghost" onClick={() => commit(true)} title="Пропустить произношение">
                 не сейчас

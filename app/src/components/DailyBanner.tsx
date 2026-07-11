@@ -57,8 +57,10 @@ export default function DailyBanner({ deck }: { deck: DeckCard[] }) {
       streak: daily.streak,
       goalMet: daily.done >= daily.goal,
       allClear: st.due === 0 && newCount === 0,
-      // Nothing studied ever and no activity history → greet the newcomer with a clear start.
-      firstRun: st.seen === 0 && daily.done === 0 && Object.keys(daily.history).length === 0,
+      // Newcomer: no card ever studied, nothing done today, never hit a daily goal. (Uses signals
+      // recordRetained() above does NOT write — it stamps history, so a history check would flip
+      // to false on the next load.)
+      firstRun: st.seen === 0 && daily.done === 0 && daily.streak === 0,
     });
   }, [deck]);
 

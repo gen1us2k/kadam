@@ -19,7 +19,16 @@ function letterColor(score: number): string {
  * Record the learner saying `target`, score pronunciation via the ASR backend, and report the
  * Analysis to the parent. Compact, reusable inline version of the /poc-speech check.
  */
-export default function SpeakPractice({ target, onResult }: { target: string; onResult: (a: Analysis) => void }) {
+export default function SpeakPractice({
+  target,
+  answered = false,
+  onResult,
+}: {
+  target: string;
+  /** True once the parent has graded this card — freezes controls and releases the mic. */
+  answered?: boolean;
+  onResult: (a: Analysis) => void;
+}) {
   const [recording, setRecording] = useState(false);
   const [status, setStatus] = useState<AsrStatus | null>(null);
   const [result, setResult] = useState<Analysis | null>(null);
@@ -29,11 +38,21 @@ export default function SpeakPractice({ target, onResult }: { target: string; on
   // Release the mic if the card changes or the component unmounts mid-recording.
   useEffect(() => () => recorderRef.current?.cancel(), []);
 
+  // If the card gets graded (e.g. «не сейчас») while still recording, stop the hot mic.
+  useEffect(() => {
+    if (answered && recording) {
+      recorderRef.current?.cancel();
+      recorderRef.current = null;
+      setRecording(false);
+    }
+  }, [answered, recording]);
+
   const busy = status !== null && status !== 'done' && status !== 'error';
   const finished = result !== null;
 
   async function startRec() {
     setError(null);
+    setStatus(null); // clear a stale error hint from a prior attempt
     try {
       const rec = new Recorder();
       await rec.start();
@@ -54,6 +73,7 @@ export default function SpeakPractice({ target, onResult }: { target: string; on
       setResult(analysis);
       onResult(analysis);
     } catch {
+      setStatus(null); // don't also show the 'error' status label
       setError('Не удалось распознать. Попробуйте ещё раз.');
     } finally {
       recorderRef.current = null;
@@ -62,7 +82,7 @@ export default function SpeakPractice({ target, onResult }: { target: string; on
 
   return (
     <div className="speak-practice">
-      {!finished && (
+      {!finished && !answered && (
         <button
           className="btn"
           onClick={recording ? stopRec : startRec}
