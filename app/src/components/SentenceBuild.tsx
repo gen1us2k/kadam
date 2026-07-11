@@ -128,7 +128,7 @@ export default function SentenceBuild({ tag, count = 6, onComplete }: Props) {
               <SpeakButton text={sentence.words.join(' ')} title="Озвучить предложение" />
             </div>
             <div className="study-meta" style={{ marginTop: '0.5rem' }}>А теперь произнесите вслух:</div>
-            <SpeakPractice key={index} target={sentence.words.join(' ')} onResult={() => {}} />
+            <SpeakPractice key={index} target={sentence.words.join(' ')} allowRetry onResult={() => {}} />
           </div>
         )}
       </div>

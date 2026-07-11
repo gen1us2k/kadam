@@ -23,11 +23,14 @@ function letterColor(score: number): string {
 export default function SpeakPractice({
   target,
   answered = false,
+  allowRetry = false,
   onResult,
 }: {
   target: string;
   /** True once the parent has graded this card — freezes controls and releases the mic. */
   answered?: boolean;
+  /** Free-practice mode: offer a "try again" after a result (word mode grades once, so omits it). */
+  allowRetry?: boolean;
   onResult: (a: Analysis) => void;
 }) {
   const [recording, setRecording] = useState(false);
@@ -109,6 +112,18 @@ export default function SpeakPractice({
       {status && STATUS_LABEL[status] ? <span className="study-meta">{STATUS_LABEL[status]}</span> : null}
       {error && <span className="study-meta">{error}</span>}
 
+      {result && allowRetry && !answered && (
+        <button
+          className="btn ghost"
+          onClick={() => {
+            setResult(null);
+            setStatus(null);
+            setError(null);
+          }}
+        >
+          ↻ ещё раз
+        </button>
+      )}
       {result && (
         <>
           <span className="speak-score" style={{ color: letterColor(result.percent / 100) }}>{result.percent}%</span>
