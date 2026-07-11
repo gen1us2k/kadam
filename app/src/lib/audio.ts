@@ -4,6 +4,11 @@
 
 const TARGET_RATE = 16000;
 
+/** AudioContext constructor with the old-Safari webkit fallback. */
+function AudioContextCtor(): typeof AudioContext {
+  return window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+}
+
 /** Why the recorder auto-stopped: no one spoke, or speech ended / hit the length cap. */
 export type AutoStopReason = 'nospeech' | 'silence' | 'maxlen';
 
@@ -24,7 +29,7 @@ const VAD_MAX_MS = 10000; // hard cap on one utterance
  * recording. Extracted so the state machine can be unit-tested without the browser audio graph.
  */
 export function vadDecision(p: { elapsedMs: number; sinceVoiceMs: number; speechStarted: boolean }): AutoStopReason | null {
-  if (p.elapsedMs > VAD_MAX_MS) return p.speechStarted ? 'silence' : 'nospeech';
+  if (p.elapsedMs > VAD_MAX_MS) return p.speechStarted ? 'maxlen' : 'nospeech';
   if (!p.speechStarted && p.elapsedMs > VAD_NO_SPEECH_MS) return 'nospeech';
   if (p.speechStarted && p.sinceVoiceMs > VAD_TRAILING_MS) return 'silence';
   return null;
@@ -60,7 +65,9 @@ export class Recorder {
       try {
         this.startVad(opts.onAutoStop);
       } catch {
-        // VAD unavailable (e.g. no Web Audio) — recording still works via the manual stop button.
+        // VAD unavailable (e.g. no Web Audio) — recording still works via the manual stop button,
+        // but tear down any half-built context so it isn't orphaned.
+        this.stopVad();
       }
     }
   }
@@ -68,16 +75,20 @@ export class Recorder {
   /** Watch the mic level and fire onAutoStop once (no-speech, endpoint, or max length). */
   private startVad(onAutoStop: (reason: AutoStopReason) => void): void {
     if (!this.stream) return;
-    const ctx = new AudioContext();
+    const ctx = new (AudioContextCtor())();
+    this.vadCtx = ctx; // assign immediately so a throw below is torn down by start()'s catch
+    // Browsers (Safari/iOS especially) hand back a suspended context outside a live gesture — it
+    // then processes nothing and getFloatTimeDomainData returns zeros. Resume it, and don't start
+    // the countdown until it's actually running (see the ctx.state guard in tick).
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const source = ctx.createMediaStreamSource(this.stream);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
     source.connect(analyser); // not connected to destination — analysis only, no playback
-    this.vadCtx = ctx;
     this.vadSource = source;
 
     const buf = new Float32Array(analyser.fftSize);
-    const startMs = performance.now();
+    let startMs = performance.now();
     let prevMs = startMs;
     let lastVoiceMs = startMs;
     let voicedRun = 0;
@@ -93,6 +104,12 @@ export class Recorder {
 
     const tick = () => {
       const now = performance.now();
+      if (ctx.state !== 'running') {
+        // Not processing yet — hold the timers at "now" so silence isn't counted against the user.
+        startMs = lastVoiceMs = prevMs = now;
+        this.vadRaf = requestAnimationFrame(tick);
+        return;
+      }
       const dt = now - prevMs;
       prevMs = now;
 
@@ -222,7 +239,7 @@ let playbackCtx: AudioContext | null = null;
 /** Play a 16 kHz mono waveform — lets the user hear exactly what the recognizer analyzed. */
 export async function playWave(wave: Float32Array, rate = TARGET_RATE): Promise<void> {
   if (wave.length === 0) return;
-  playbackCtx ??= new AudioContext({ sampleRate: rate });
+  playbackCtx ??= new (AudioContextCtor())({ sampleRate: rate });
   if (playbackCtx.state === 'suspended') await playbackCtx.resume();
   const buffer = playbackCtx.createBuffer(1, wave.length, rate);
   buffer.getChannelData(0).set(wave);
@@ -237,9 +254,7 @@ export async function playWave(wave: Float32Array, rate = TARGET_RATE): Promise<
 
 /** Decode an encoded audio blob and resample to 16 kHz mono Float32. */
 async function decodeTo16kMono(bytes: ArrayBuffer): Promise<Float32Array> {
-  const AudioCtx: typeof AudioContext =
-    window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-  const tmp = new AudioCtx();
+  const tmp = new (AudioContextCtor())();
   let decoded: AudioBuffer;
   try {
     decoded = await tmp.decodeAudioData(bytes.slice(0));

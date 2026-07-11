@@ -56,7 +56,7 @@ check('no speech past 3s -> nospeech', V(3200, 3200, false) === 'nospeech');
 check('speaking, short pause -> keep', V(2000, 400, true) === null);
 check('speech then 0.9s+ silence -> endpoint', V(2000, 1000, true) === 'silence');
 check('speaking continuously -> keep', V(2000, 0, true) === null);
-check('max length with speech -> silence', V(11000, 200, true) === 'silence');
+check('max length with speech -> maxlen', V(11000, 200, true) === 'maxlen');
 check('max length no speech -> nospeech', V(11000, 11000, false) === 'nospeech');
 
 console.log(fail === 0 ? 'ALL TESTS PASSED' : `\n${fail} TEST(S) FAILED`);

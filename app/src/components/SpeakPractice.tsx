@@ -80,6 +80,7 @@ export default function SpeakPractice({
   async function stopRec() {
     const rec = recorderRef.current;
     if (!rec) return;
+    recorderRef.current = null; // claim it synchronously so a VAD-fire + click can't double-stop
     setRecording(false);
     try {
       const wave = await rec.stop();
@@ -89,8 +90,6 @@ export default function SpeakPractice({
     } catch {
       setStatus(null); // don't also show the 'error' status label
       setError('Не удалось распознать. Попробуйте ещё раз.');
-    } finally {
-      recorderRef.current = null;
     }
   }
 
