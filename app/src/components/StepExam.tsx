@@ -103,10 +103,12 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Readiness: how much of this step's vocabulary is actually retained before attempting the test.
-  const ready = useMemo(() => {
+  // Computed in an effect (not during render) so it doesn't read localStorage during SSR.
+  const [ready, setReady] = useState<{ retained: number; total: number; frac: number; ok: boolean } | null>(null);
+  useEffect(() => {
     const s = deckStats(deck, loadStore(), Date.now(), tag);
     const frac = s.total > 0 ? s.retained / s.total : 0;
-    return { retained: s.retained, total: s.total, frac, ok: frac >= 0.5 };
+    setReady({ retained: s.retained, total: s.total, frac, ok: frac >= 0.5 });
   }, [deck, tag]);
 
   const finished = questions.length > 0 && index >= questions.length;
@@ -184,7 +186,7 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
 
   return (
     <div className="study">
-      {ready.total > 0 && (
+      {ready && ready.total > 0 && (
         <div className={`exam-ready ${ready.ok ? 'ok' : 'low'}`} title="Слова шага, реально удержанные в памяти (FSRS)">
           Готовность: {Math.round(ready.frac * 100)}% ({ready.retained}/{ready.total} слов)
           {!ready.ok && ' — стоит сперва повторить слова шага'}
