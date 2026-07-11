@@ -16,8 +16,8 @@ function letterColor(score: number): string {
 }
 
 /**
- * Record the learner saying `target`, score pronunciation via the ASR backend, and report the
- * Analysis to the parent. Compact, reusable inline version of the /poc-speech check.
+ * Record the learner saying `target`, score pronunciation via the ASR backend (per-letter GOP),
+ * and report the Analysis to the parent.
  */
 export default function SpeakPractice({
   target,

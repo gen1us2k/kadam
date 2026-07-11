@@ -41,6 +41,7 @@ export default function StatsPanel({ deck }: Props) {
   const [streak, setStreak] = useState(0);
   const [history, setHistory] = useState<Record<string, DayEntry>>({});
   const [perDay, setPerDay] = useState<number | null>(null);
+  const [refresh, setRefresh] = useState(0); // bumped after a store write (e.g. leech revive)
 
   useEffect(() => {
     const store = loadStore();
@@ -64,7 +65,7 @@ export default function StatsPanel({ deck }: Props) {
     setStreak(daily.streak);
     setHistory(daily.history);
     setPerDay(pace(daily.history, st.retained));
-  }, [deck]);
+  }, [deck, refresh]);
 
   if (!stats || stats.seen === 0) return null;
 
@@ -117,7 +118,7 @@ export default function StatsPanel({ deck }: Props) {
                   title="Сбросить счётчик промахов и показать в следующей сессии"
                   onClick={() => {
                     reviveLeech(loadStore(), cardId(x), Date.now());
-                    setLeeches((ls) => ls.filter((l) => l.kg !== x.kg || l.ru !== x.ru));
+                    setRefresh((r) => r + 1); // recompute the whole panel (leeches, due, weak words)
                   }}
                 >
                   ↩ вернуть в повторение

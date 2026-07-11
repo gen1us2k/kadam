@@ -17,8 +17,8 @@ const check = (name: string, cond: boolean, got?: unknown) => {
 
 // --- containment (must resolve inside ROOT) ---
 check('root -> index.html', resolveStatic(ROOT, '/') === `${ROOT}${sep}index.html`);
-check('trailing slash -> index.html', resolveStatic(ROOT, '/poc-speech/') === `${ROOT}${sep}poc-speech${sep}index.html`);
-check('extensionless -> dir index', resolveStatic(ROOT, '/poc-speech') === `${ROOT}${sep}poc-speech${sep}index.html`);
+check('trailing slash -> index.html', resolveStatic(ROOT, '/study/') === `${ROOT}${sep}study${sep}index.html`);
+check('extensionless -> dir index', resolveStatic(ROOT, '/study') === `${ROOT}${sep}study${sep}index.html`);
 check('asset passthrough', resolveStatic(ROOT, '/tts/model.onnx') === `${ROOT}${sep}tts${sep}model.onnx`);
 check('dot-segment inside stays inside', resolveStatic(ROOT, '/a/../b.js') === `${ROOT}${sep}b.js`);
 
