@@ -435,6 +435,12 @@ tr[hidden] { display: none; }
 
 .choice-key { display: inline-block; min-width: 1.2em; color: var(--muted); font-size: 0.8em; font-weight: 700; }
 
+/* Actionable leech list */
+.leech-list { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+.leech-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.35rem 0; border-bottom: 1px solid var(--border); }
+.leech-list li:last-child { border-bottom: none; }
+.leech-list .btn { flex-shrink: 0; }
+
 /* Keyboard hints */
 .kbd-hints { color: var(--muted); font-size: 0.8rem; margin-top: 0.4rem; }
 .kbd-hints kbd { border: 1px solid var(--border); border-radius: 4px; padding: 0 0.3rem; font-size: 0.85em; background: var(--surface); }

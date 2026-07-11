@@ -1,8 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
 import StudySession from '../components/StudySession.tsx';
-import Drills from '../components/Drills.tsx';
-import SentenceBuild from '../components/SentenceBuild.tsx';
 import StatsPanel from '../components/StatsPanel.tsx';
 import { loadVocab } from '../lib/vocab';
 
@@ -14,28 +12,14 @@ const deck = loadVocab();
     <h1>Дневная сессия</h1>
     <p>
       Смешанное повторение (FSRS): просроченные карточки со всех тем + новые, вперемешку.
-      Новые слова показываются на узнавание, зрелые — на письмо, cloze и диктант на слух.
-      Новых тем меньше, чем больше накопилось повторений (чтобы не завалить себя); упорно
-      забываемые слова («пиявки») откладываются для отдельного разбора. Ошиблись — слово
-      вернётся через 10 минут.
+      Новые слова показываются на узнавание, зрелые — на письмо, cloze, диктант на слух и
+      произношение вслух. Новых тем меньше, чем больше накопилось повторений (чтобы не завалить
+      себя); упорно забываемые слова («пиявки») откладываются для отдельного разбора. Ошиблись —
+      слово вернётся через 10 минут. Дриллы и сборка предложений живут на своих станциях пути.
     </p>
   </section>
 
   <StatsPanel deck={deck} client:load />
 
   <StudySession deck={deck} client:load />
-
-  <section class="prose" style="margin-top:2.5rem">
-    <h2>Грамматические дриллы</h2>
-    <p class="study-meta">Суффиксы и глагольные времена на автомат: мн. число, падежи, настоящее/прошедшее/будущее, отрицание — по правилам сингармонизма.</p>
-  </section>
-
-  <Drills client:visible />
-
-  <section class="prose" style="margin-top:2.5rem">
-    <h2>Сборка предложений</h2>
-    <p class="study-meta">Порядок слов SOV: соберите кыргызскую фразу из банка слов, глагол — в конце.</p>
-  </section>
-
-  <SentenceBuild client:visible />
 </Base>

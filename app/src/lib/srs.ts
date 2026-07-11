@@ -194,6 +194,17 @@ export function deckStats(deck: DeckCard[], store: Store, now: number, tag?: str
   return st;
 }
 
+/**
+ * Un-suspend a leech after the learner has worked on it (mnemonic, native check): clear the
+ * lapse counter and make it due now, so it re-enters the next queue with its history kept.
+ */
+export function reviveLeech(store: Store, id: string, now: number): void {
+  const st = store[id];
+  if (!st) return;
+  store[id] = { ...st, lapses: 0, due: now };
+  saveStore(store);
+}
+
 /** Leech cards (most lapses first): need a mnemonic or native review, not blind repetition. */
 export function leechCards(deck: DeckCard[], store: Store): { card: DeckCard; state: CardState }[] {
   return deck

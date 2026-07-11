@@ -10,13 +10,14 @@ interface Props {
 
 const { title, description = 'Кыргызский язык за 10–12 недель по принципу 80/20.', active = '' } = Astro.props;
 
+// Journey is the single plan; the nav keeps only it, the daily session, and the two ad-hoc
+// tools with standalone value (paste-any-text reader, dictionary browser). Survival phrases
+// live as a journey station; pronunciation checks live inside the session.
 const links = [
   { href: '/', label: 'Путь' },
   { href: '/study', label: 'Сессия' },
   { href: '/reader', label: 'Чтение' },
-  { href: '/phrases', label: 'Разговорник' },
   { href: '/vocab', label: 'Словарь' },
-  { href: '/poc-speech', label: 'Речь · PoC' },
 ];
 ---
 

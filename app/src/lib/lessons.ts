@@ -25,7 +25,7 @@ export function cleanLinks(md: string): string {
   return md
     .replace(/\[([^\]]+)\]\([^)]*grammar-cheatsheet\.md[^)]*\)/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*week-\d+[^)]*\)/g, '$1')
-    .replace(/\[([^\]]+)\]\([^)]*phrases\.md[^)]*\)/g, '[$1](/phrases)')
+    .replace(/\[([^\]]+)\]\([^)]*phrases\.md[^)]*\)/g, '[$1](/#jstep-ph-step01)') // the survival-phrases journey station
     .replace(/\[([^\]]+)\]\([^)]*(?:kyrgyz-frequency\.csv|anki\/?[^)]*)\)/g, '[$1](/vocab)');
 }
 

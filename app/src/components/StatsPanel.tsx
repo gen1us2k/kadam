@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { deckStats, isLeech, leechCards, loadStore, weakestCards } from '../lib/srs';
+import { cardId, deckStats, isLeech, leechCards, loadStore, reviveLeech, weakestCards } from '../lib/srs';
 import type { DeckCard, DeckStats } from '../lib/srs';
 import { loadDaily, pace, recordRetained, todayStr } from '../lib/daily';
 import type { DayEntry } from '../lib/daily';
+import SpeakButton from './SpeakButton';
 
 interface Props {
   deck: DeckCard[];
 }
 
-type Word = { kg: string; ru: string; lapses: number };
+type Word = { kg: string; ru: string; lapses: number; example?: string };
 
 /** Course vocabulary goal — drives the pace forecast. */
 const WORD_TARGET = 1500;
@@ -53,7 +54,11 @@ export default function StatsPanel({ deck }: Props) {
         .slice(0, 5)
         .map(({ card, state }) => ({ kg: card.kg, ru: card.ru, lapses: state.lapses })),
     );
-    setLeeches(leechCards(deck, store).slice(0, 8).map(({ card, state }) => ({ kg: card.kg, ru: card.ru, lapses: state.lapses })));
+    setLeeches(
+      leechCards(deck, store)
+        .slice(0, 8)
+        .map(({ card, state }) => ({ kg: card.kg, ru: card.ru, lapses: state.lapses, example: card.example })),
+    );
     recordRetained(st.retained); // today's snapshot feeds the pace forecast
     const daily = loadDaily();
     setStreak(daily.streak);
@@ -94,10 +99,33 @@ export default function StatsPanel({ deck }: Props) {
         </p>
       )}
       {leeches.length > 0 && (
-        <p className="study-meta leech-line">
-          🐛 Пиявки (застряли, отключены из повторения): {leeches.map((x) => `${x.kg} — ${x.ru}`).join(', ')}.
-          {' '}Разберите отдельно: мнемоника, пример, разбор с носителем.
-        </p>
+        <div className="leech-block">
+          <p className="study-meta leech-line">
+            🐛 Пиявки — застряли и отключены из повторения. Разберите (мнемоника, пример, носитель)
+            и верните в очередь:
+          </p>
+          <ul className="leech-list">
+            {leeches.map((x) => (
+              <li key={`${x.kg}|${x.ru}`}>
+                <span>
+                  <b>{x.kg}</b> — {x.ru} <SpeakButton text={x.kg} />
+                  <span className="study-meta"> · {x.lapses} промахов</span>
+                  {x.example && <div className="study-meta">{x.example}</div>}
+                </span>
+                <button
+                  className="btn ghost"
+                  title="Сбросить счётчик промахов и показать в следующей сессии"
+                  onClick={() => {
+                    reviveLeech(loadStore(), cardId(x), Date.now());
+                    setLeeches((ls) => ls.filter((l) => l.kg !== x.kg || l.ru !== x.ru));
+                  }}
+                >
+                  ↩ вернуть в повторение
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

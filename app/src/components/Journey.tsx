@@ -84,6 +84,12 @@ export default function Journey({ steps, deck }: Props) {
     setMastery(m);
     setDueTotal(deckStats(deck, store, now).due);
     setReady(true);
+    // Deep link: /#jstep-<id> opens that station (e.g. lesson links to the phrases station).
+    const hash = window.location.hash.slice(1);
+    if (hash.startsWith('jstep-')) {
+      const idx = steps.findIndex((s) => domId(s) === hash);
+      if (idx >= 0) setOpenIdx(idx);
+    }
   }, [steps, deck]);
 
   function toggleDone(id: string) {
