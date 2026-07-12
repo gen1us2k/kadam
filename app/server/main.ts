@@ -269,4 +269,4 @@ try {
   console.warn(`[warn] ${STATIC_DIR}/index.html not found — run \`npm run build\` to serve the app`);
 }
 
-server.listen(PORT, () => console.log(`kyrgyz app on http://localhost:${PORT}  (api + dist, models: ${MODELS_DIR})`));
+server.listen(PORT, () => console.log(`Кадам (kadam) on http://localhost:${PORT}  (api + dist, models: ${MODELS_DIR})`));

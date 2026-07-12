@@ -6,8 +6,8 @@
 
 | Что | Где |
 |---|---|
-| Веб-приложение: путь изучения (уроки + интервальное повторение) | [web/](web/) |
-| Уроки-шаги (источник контента приложения) | [web/src/content/steps/](web/src/content/steps/) |
+| **Кадам** — приложение-путь: уроки, повторение (FSRS), речь (TTS+ASR) | [app/](app/) |
+| Уроки-шаги (источник контента приложения) | [app/src/content/steps/](app/src/content/steps/) |
 | Разговорник выживания (первые 50 фраз) | [phrases.md](phrases.md) |
 | Частотный словарь для Anki (~450 слов, с тегами по шагам) | [anki/kyrgyz-frequency.csv](anki/kyrgyz-frequency.csv) |
 | Как импортировать колоду в Anki | [anki/README.md](anki/README.md) |

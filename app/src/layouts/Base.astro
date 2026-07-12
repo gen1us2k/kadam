@@ -8,7 +8,7 @@ interface Props {
   active?: string;
 }
 
-const { title, description = 'Кыргызский язык за 10–12 недель по принципу 80/20.', active = '' } = Astro.props;
+const { title, description = 'Кадам — кыргызский шаг за шагом: язык за 10–12 недель по принципу 80/20.', active = '' } = Astro.props;
 
 // Journey is the single plan; the nav keeps only it, the daily session, and the two ad-hoc
 // tools with standalone value (paste-any-text reader, dictionary browser). Survival phrases
@@ -32,7 +32,7 @@ const links = [
   <body>
     <header class="site-header">
       <nav class="nav wrap">
-        <a class="brand" href="/">Кыргызча 80/20</a>
+        <a class="brand" href="/">Кадам</a>
         {links.map((l) => (
           <a href={l.href} class={active === l.href ? 'active' : ''}>{l.label}</a>
         ))}
