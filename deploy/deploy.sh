@@ -32,15 +32,16 @@ log "installing deps, building, restarting on the droplet"
 ssh "$HOST" "bash -euo pipefail -s" <<REMOTE
   chown -R $APP_USER:$APP_USER "$REMOTE_DIR"
   cd "$REMOTE_DIR/app"
-  sudo -u $APP_USER npm ci
-  sudo -u $APP_USER npm run build
+  # -H sets HOME=/home/$APP_USER so npm's cache doesn't hit /root/.npm (EACCES).
+  sudo -Hu $APP_USER npm ci
+  sudo -Hu $APP_USER npm run build
   systemctl restart kadam
-  # wait for health
-  for i in \$(seq 1 20); do
+  # Wait for health — cold start loads ~470 MB of ONNX + ORT graph init, slow on a 1-vCPU box.
+  for i in \$(seq 1 60); do
     if curl -fsS http://127.0.0.1:4321/api/health >/dev/null 2>&1; then echo "[deploy] healthy ✓"; exit 0; fi
     sleep 1
   done
-  echo "[deploy] service did not become healthy — check: journalctl -u kadam -n 50" >&2
+  echo "[deploy] service did not become healthy in 60s — check: journalctl -u kadam -n 50" >&2
   exit 1
 REMOTE
 
