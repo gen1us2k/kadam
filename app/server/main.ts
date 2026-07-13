@@ -28,6 +28,9 @@ const MODELS_DIR = process.env.MODELS_DIR ?? fileURLToPath(new URL('../models', 
 // The built app (astro build -> dist) is served from the same port as /api.
 const STATIC_DIR = process.env.STATIC_DIR ?? fileURLToPath(new URL('../dist', import.meta.url));
 const PORT = Number(process.env.PORT ?? 4321);
+// Bind address: unset = all interfaces (local dev). In production, HOST=127.0.0.1 keeps the app
+// private behind the reverse proxy (see deploy/).
+const HOST = process.env.HOST;
 const SAMPLE_RATE = 16000;
 const MAX_SECONDS = 30;
 const MAX_BODY = 44 + MAX_SECONDS * SAMPLE_RATE * 2; // WAV header + 30 s of 16-bit samples
@@ -269,4 +272,4 @@ try {
   console.warn(`[warn] ${STATIC_DIR}/index.html not found — run \`npm run build\` to serve the app`);
 }
 
-server.listen(PORT, () => console.log(`Кадам (kadam) on http://localhost:${PORT}  (api + dist, models: ${MODELS_DIR})`));
+server.listen(PORT, HOST, () => console.log(`Кадам (kadam) on http://${HOST ?? 'localhost'}:${PORT}  (api + dist, models: ${MODELS_DIR})`));
