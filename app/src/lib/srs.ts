@@ -4,6 +4,8 @@
 
 import { fsrsInit, fsrsReview, fsrsInterval, retrievability } from './fsrs';
 import type { Grade } from './fsrs';
+import { loadJson, saveJson } from './storage';
+import { shuffle } from './study-utils';
 
 export type { Grade } from './fsrs';
 
@@ -95,16 +97,6 @@ export function gradeAnswer(prev: CardState | undefined, g: Grade, now: number):
 /** Binary convenience wrapper: correct → Good, wrong → Again. */
 export function grade(prev: CardState | undefined, correct: boolean, now: number): CardState {
   return gradeAnswer(prev, correct ? 3 : 1, now);
-}
-
-/** Deterministic-enough shuffle for study queues (client-side only). */
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
 }
 
 export interface QueueOptions {
@@ -255,12 +247,7 @@ export function loadStore(): Store {
 }
 
 export function saveStore(store: Store): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(store));
-  } catch {
-    // Quota or private-mode failure — non-fatal for a study aid.
-  }
+  saveJson(STORE_KEY, store);
 }
 
 // --- Learn-next list: words hand-picked (e.g. in the reader) to introduce first. ---
@@ -268,23 +255,12 @@ export function saveStore(store: Store): void {
 const LEARN_KEY = 'kyrgyz-learn-v1';
 
 export function loadLearnList(): string[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(LEARN_KEY);
-    const list = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
-  } catch {
-    return [];
-  }
+  const list = loadJson<unknown>(LEARN_KEY, []);
+  return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
 }
 
 function saveLearnList(list: string[]): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(LEARN_KEY, JSON.stringify(list));
-  } catch {
-    // non-fatal
-  }
+  saveJson(LEARN_KEY, list);
 }
 
 export function addToLearn(id: string): void {

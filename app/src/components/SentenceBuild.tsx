@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { pickSentences, rng } from '../lib/sentences';
+import { pickSentences } from '../lib/sentences';
+import { rng } from '../lib/study-utils';
 import { daySeed, recordAnswer } from '../lib/daily';
-import SpeakButton from './SpeakButton';
 import SpeakPractice from './SpeakPractice';
+import AnswerFeedback from './AnswerFeedback';
 
 interface Props {
   /** Optional step tag, e.g. "step04". Omit for a mixed set. */
@@ -121,15 +122,15 @@ export default function SentenceBuild({ tag, count = 6, onComplete }: Props) {
             Проверить
           </button>
         ) : (
-          <div className={`study-feedback ${answered ? 'ok' : 'bad'}`}>
-            <div>
-              {answered ? '✓ Верно' : `✗ Правильно: ${sentence.words.join(' ')}`}
-              {' '}
-              <SpeakButton text={sentence.words.join(' ')} title="Озвучить предложение" />
-            </div>
+          <AnswerFeedback
+            correct={answered}
+            answer={sentence.words.join(' ')}
+            speakText={sentence.words.join(' ')}
+            speakTitle="Озвучить предложение"
+          >
             <div className="study-meta" style={{ marginTop: '0.5rem' }}>А теперь произнесите вслух:</div>
             <SpeakPractice key={index} target={sentence.words.join(' ')} allowRetry onResult={() => {}} />
-          </div>
+          </AnswerFeedback>
         )}
       </div>
       <div className="study-footer">

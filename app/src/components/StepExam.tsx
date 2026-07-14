@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { deckStats, loadStore } from '../lib/srs';
 import type { DeckCard } from '../lib/srs';
 import { buildDrills } from '../lib/morphology';
 import { daySeed, recordAnswer } from '../lib/daily';
-import SpeakButton from './SpeakButton';
+import { loadJson, saveJson } from '../lib/storage';
+import { shuffle, norm } from '../lib/study-utils';
+import KgTextInput from './KgTextInput';
+import AnswerFeedback from './AnswerFeedback';
 
 interface Props {
   deck: DeckCard[];
@@ -24,43 +27,21 @@ const EXAM_KEY = 'kyrgyz-exams-v1';
 type ExamLog = Record<string, { best: number; total: number }>;
 
 function loadExamLog(): ExamLog {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    return JSON.parse(localStorage.getItem(EXAM_KEY) ?? '{}') as ExamLog;
-  } catch {
-    return {};
-  }
+  return loadJson<ExamLog>(EXAM_KEY, {});
 }
 
 function recordExam(examId: string, score: number, total: number): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    const log = loadExamLog();
-    const prev = log[examId];
-    if (!prev || score > prev.best || prev.total !== total) {
-      log[examId] = { best: Math.max(score, prev?.total === total ? prev.best : 0), total };
-      localStorage.setItem(EXAM_KEY, JSON.stringify(log));
-    }
-  } catch {
-    // non-fatal
+  const log = loadExamLog();
+  const prev = log[examId];
+  if (!prev || score > prev.best || prev.total !== total) {
+    log[examId] = { best: Math.max(score, prev?.total === total ? prev.best : 0), total };
+    saveJson(EXAM_KEY, log);
   }
 }
-
-const KG_LETTERS = ['ң', 'ө', 'ү'];
-const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 type Question =
   | { kind: 'mc'; prompt: string; kg: string; answer: string; options: string[] }
   | { kind: 'typed'; label: string; prompt: string; answer: string };
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
 
 const VOCAB_Q = 8;
 
@@ -100,7 +81,6 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
   const [answered, setAnswered] = useState<null | { correct: boolean; picked?: string }>(null);
   const [typedValue, setTypedValue] = useState('');
   const [score, setScore] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Readiness: how much of this step's vocabulary is actually retained before attempting the test.
   // Computed in an effect (not during render) so it doesn't read localStorage during SSR.
@@ -146,18 +126,6 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
     setAnswered(null);
     setTypedValue('');
     setScore(0);
-  }
-
-  function insertLetter(ch: string) {
-    const el = inputRef.current;
-    if (!el) return;
-    const start = el.selectionStart ?? typedValue.length;
-    const end = el.selectionEnd ?? typedValue.length;
-    setTypedValue(typedValue.slice(0, start) + ch + typedValue.slice(end));
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start + 1, start + 1);
-    });
   }
 
   if (questions.length === 0) {
@@ -215,34 +183,11 @@ export default function StepExam({ deck, tag, drillTasks, pass = 0.8, examId, on
         )}
 
         {!isMc && (
-          <div className="typed">
-            <input
-              ref={inputRef}
-              type="text"
-              value={typedValue}
-              disabled={!!answered}
-              onChange={(e) => setTypedValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !answered) submitTyped(); }}
-              placeholder="кыргызча…"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-            <div className="typed-tools">
-              {KG_LETTERS.map((ch) => (
-                <button key={ch} className="kbd-btn" onClick={() => insertLetter(ch)} disabled={!!answered}>{ch}</button>
-              ))}
-              {!answered && <button className="btn" onClick={submitTyped}>Проверить</button>}
-            </div>
-          </div>
+          <KgTextInput value={typedValue} onChange={setTypedValue} onSubmit={submitTyped} disabled={!!answered} />
         )}
 
         {answered && (
-          <div className={`study-feedback ${answered.correct ? 'ok' : 'bad'}`}>
-            {answered.correct ? '✓ Верно' : `✗ Правильно: ${q.answer}`}
-            {' '}
-            <SpeakButton text={q.kind === 'mc' ? q.kg : q.answer} />
-          </div>
+          <AnswerFeedback correct={answered.correct} answer={q.answer} speakText={q.kind === 'mc' ? q.kg : q.answer} />
         )}
       </div>
       <div className="study-footer">

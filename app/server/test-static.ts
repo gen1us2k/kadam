@@ -4,16 +4,11 @@
 
 import { sep } from 'node:path';
 import { CONTENT_TYPES, cacheControl, resolveStatic, weakEtag } from './static.ts';
+import { createChecker } from './test-util.ts';
 
 const ROOT = `${sep}srv${sep}dist`; // platform-correct absolute root
 
-let fail = 0;
-const check = (name: string, cond: boolean, got?: unknown) => {
-  if (!cond) {
-    fail++;
-    console.log('FAIL:', name, '| got', got);
-  }
-};
+const { check, done } = createChecker();
 
 // --- containment (must resolve inside ROOT) ---
 check('root -> index.html', resolveStatic(ROOT, '/') === `${ROOT}${sep}index.html`);
@@ -49,5 +44,4 @@ check('etag differs on size', weakEtag(1234567.89, 42) !== weakEtag(1234567.89, 
 check('js type', CONTENT_TYPES['.js']?.startsWith('text/javascript') === true);
 check('wasm type', CONTENT_TYPES['.wasm'] === 'application/wasm');
 
-console.log(fail === 0 ? 'ALL STATIC TESTS PASSED' : `${fail} TEST(S) FAILED`);
-process.exit(fail === 0 ? 0 : 1);
+done('ALL STATIC TESTS PASSED');

@@ -5,6 +5,8 @@
 // stems (the curated DRILL_VERBS); irregular verbs are excluded.
 // ⚠️ Verb forms are model-authored — worth a native-speaker spot-check.
 
+import { rng } from './study-utils';
+
 const BACK_UNROUNDED = 'аы';
 const FRONT_UNROUNDED = 'еэи';
 const BACK_ROUNDED_O = 'о';
@@ -143,12 +145,7 @@ export function buildDrills(count: number, seed: number, tasks?: string[]): Dril
   const types = tasks ? DRILL_TYPES.filter((t) => tasks.includes(t.task)) : DRILL_TYPES;
   if (types.length === 0) return [];
   const drills: Drill[] = [];
-  let x = seed || 1;
-  const next = () => {
-    // xorshift32 — deterministic, no Math.random (stable per day)
-    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
-    return Math.abs(x);
-  };
+  const next = rng(seed);
   const capacity = types.reduce((n, t) => n + t.words.length, 0);
   const used = new Set<string>();
   while (drills.length < count && used.size < capacity) {

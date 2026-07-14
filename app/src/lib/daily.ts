@@ -10,6 +10,8 @@ export interface DayEntry {
   r?: number;
 }
 
+import { saveJson } from './storage';
+
 export interface DailyState {
   /** Local date "YYYY-MM-DD" the counters belong to. */
   day: string;
@@ -75,12 +77,7 @@ export function loadDaily(now = new Date()): DailyState {
 }
 
 function save(s: DailyState): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(s));
-  } catch {
-    // non-fatal
-  }
+  saveJson(KEY, s);
 }
 
 /** Record one answered item; returns the updated state. */

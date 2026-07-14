@@ -8,6 +8,8 @@
 // Each tag carries exactly 15 sentences; the journey station shows all 15.
 // ⚠️ Model-authored — worth a native-speaker review before trusting every form.
 
+import { rng } from './study-utils';
+
 export interface Sentence {
   /** Russian prompt to translate/assemble. */
   ru: string;
@@ -222,17 +224,6 @@ export const SENTENCES: Sentence[] = [
   { ru: 'Доброе слово радует человека.', words: ['Жакшы', 'сөз', 'кишини', 'кубантат'], tag: 'step13' },
   { ru: 'Я всегда говорю с уважением.', words: ['Мен', 'ар', 'дайым', 'урмат', 'менен', 'сүйлөйм'], tag: 'step13' },
 ];
-
-/** xorshift32 — deterministic per seed (matches the drills' daily-stable behaviour). */
-export function rng(seed: number): () => number {
-  let x = seed || 1;
-  return () => {
-    x ^= x << 13;
-    x ^= x >>> 17;
-    x ^= x << 5;
-    return Math.abs(x);
-  };
-}
 
 /** Deterministic sentence set for a seed; optional step-tag filter. */
 export function pickSentences(count: number, seed: number, tag?: string): Sentence[] {

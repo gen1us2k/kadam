@@ -7,6 +7,7 @@ import StepExam from './StepExam';
 import { deckStats, loadStore } from '../lib/srs';
 import type { DeckCard, DeckStats } from '../lib/srs';
 import type { JourneyStep } from '../lib/journey';
+import { loadJson, saveJson } from '../lib/storage';
 
 interface Props {
   steps: JourneyStep[];
@@ -16,24 +17,8 @@ interface Props {
 const KEY = 'kyrgyz-journey-v1';
 type Progress = Record<string, boolean>;
 
-function load(): Progress {
-  if (typeof localStorage === 'undefined') return {};
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Progress) : {};
-  } catch {
-    return {};
-  }
-}
-
-function save(p: Progress): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(p));
-  } catch {
-    // ignore
-  }
-}
+const load = (): Progress => loadJson<Progress>(KEY, {});
+const save = (p: Progress): void => saveJson(KEY, p);
 
 const ICON: Record<JourneyStep['type'], string> = {
   grammar: '📖',

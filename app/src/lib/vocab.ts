@@ -1,5 +1,6 @@
 import stepRaw from '../../../anki/kyrgyz-frequency.csv?raw';
 import corpusRaw from '../../../anki/kyrgyz-corpus-b2.csv?raw';
+import { cardId } from './srs';
 
 export interface VocabRow {
   kg: string;
@@ -35,7 +36,7 @@ export function loadVocab(): VocabRow[] {
   const seen = new Set<string>();
   const merged: VocabRow[] = [];
   for (const row of [...parse(stepRaw, false), ...parse(corpusRaw, true)]) {
-    const id = `${row.kg}|${row.ru}`;
+    const id = cardId(row);
     if (seen.has(id)) continue;
     seen.add(id);
     merged.push(row);

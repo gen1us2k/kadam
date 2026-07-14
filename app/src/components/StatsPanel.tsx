@@ -107,7 +107,7 @@ export default function StatsPanel({ deck }: Props) {
           </p>
           <ul className="leech-list">
             {leeches.map((x) => (
-              <li key={`${x.kg}|${x.ru}`}>
+              <li key={cardId(x)}>
                 <span>
                   <b>{x.kg}</b> — {x.ru} <SpeakButton text={x.kg} />
                   <span className="study-meta"> · {x.lapses} промахов</span>

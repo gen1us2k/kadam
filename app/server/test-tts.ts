@@ -4,14 +4,9 @@
 
 import { readFileSync } from 'node:fs';
 import { parseTokens, tokenize, encodeWav } from './tts.ts';
+import { createChecker } from './test-util.ts';
 
-let fail = 0;
-const check = (name: string, cond: boolean, got?: unknown) => {
-  if (!cond) {
-    fail++;
-    console.log('FAIL:', name, '| got', got);
-  }
-};
+const { check, done } = createChecker();
 
 // --- parseTokens on a synthetic table (space is the "  <id>" line) ---
 const table = parseTokens('  0\nа 5\nс 7\nл 9\nм 11\n');
@@ -48,5 +43,4 @@ try {
   console.log('note: models/tts/tokens.txt not present — skipped real-table checks');
 }
 
-console.log(fail === 0 ? 'ALL TTS TESTS PASSED' : `${fail} TEST(S) FAILED`);
-process.exit(fail === 0 ? 0 : 1);
+done('ALL TTS TESTS PASSED');

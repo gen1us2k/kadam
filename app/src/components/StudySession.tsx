@@ -7,8 +7,11 @@ import type { CardState, DeckCard, Grade, Store } from '../lib/srs';
 import { loadDaily, recordAnswer } from '../lib/daily';
 import type { DailyState } from '../lib/daily';
 import { speak } from '../lib/tts';
+import { shuffle, norm } from '../lib/study-utils';
 import SpeakButton from './SpeakButton';
 import SpeakPractice from './SpeakPractice';
+import KgTextInput from './KgTextInput';
+import AnswerFeedback from './AnswerFeedback';
 
 interface Props {
   /** Full vocabulary deck (also used to draw distractor options). */
@@ -26,17 +29,6 @@ type Mode = 'mc' | 'mcrev' | 'typed' | 'cloze' | 'listen' | 'speak';
 
 /** Pronunciation pass threshold (mean per-letter GOP, 0..1) for a mature spoken card. */
 const SPEAK_PASS = 0.5;
-
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
 /** Find the example token that inflects the headword (longest shared prefix). */
 function clozeToken(card: DeckCard): string | null {
@@ -70,8 +62,6 @@ function modeFor(card: DeckCard, store: Store): Mode {
   return 'typed';
 }
 
-const KG_LETTERS = ['ң', 'ө', 'ү'];
-
 export default function StudySession({ deck, tag }: Props) {
   const [ready, setReady] = useState(false);
   const storeRef = useRef<Store>({});
@@ -81,7 +71,6 @@ export default function StudySession({ deck, tag }: Props) {
   const [typedValue, setTypedValue] = useState('');
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [daily, setDaily] = useState<DailyState | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const store = loadStore();
@@ -145,19 +134,6 @@ export default function StudySession({ deck, tag }: Props) {
     setAnswered(null);
     setTypedValue('');
     setScore({ correct: 0, total: 0 });
-  }
-
-  function insertLetter(ch: string) {
-    const el = inputRef.current;
-    if (!el) return;
-    const start = el.selectionStart ?? typedValue.length;
-    const end = el.selectionEnd ?? typedValue.length;
-    const nextVal = typedValue.slice(0, start) + ch + typedValue.slice(end);
-    setTypedValue(nextVal);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start + 1, start + 1);
-    });
   }
 
   const isChoice = mode === 'mc' || mode === 'mcrev';
@@ -289,35 +265,11 @@ export default function StudySession({ deck, tag }: Props) {
         )}
 
         {(mode === 'typed' || mode === 'cloze' || mode === 'listen') && (
-          <div className="typed">
-            <input
-              ref={inputRef}
-              type="text"
-              value={typedValue}
-              disabled={!!answered}
-              onChange={(e) => setTypedValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !answered) submitTyped(); }}
-              placeholder="кыргызча…"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-            <div className="typed-tools">
-              {KG_LETTERS.map((ch) => (
-                <button key={ch} className="kbd-btn" onClick={() => insertLetter(ch)} disabled={!!answered}>{ch}</button>
-              ))}
-              {!answered && <button className="btn" onClick={submitTyped}>Проверить</button>}
-            </div>
-          </div>
+          <KgTextInput value={typedValue} onChange={setTypedValue} onSubmit={submitTyped} disabled={!!answered} />
         )}
 
         {answered && (
-          <div className={`study-feedback ${answered.correct ? 'ok' : 'bad'}`}>
-            <div>
-              {answered.correct ? '✓ Верно' : `✗ Правильно: ${expectedAnswer}`}
-              {' '}
-              <SpeakButton text={card.kg} />
-            </div>
+          <AnswerFeedback correct={answered.correct} answer={expectedAnswer} speakText={card.kg}>
             {card.example && (
               <div className="study-example">
                 {card.example} <SpeakButton text={card.example} title="Озвучить пример" />
@@ -326,7 +278,7 @@ export default function StudySession({ deck, tag }: Props) {
             {isUnverified(card) && (
               <div className="study-meta unverified-note">⚠ Перевод сгенерирован, не проверен носителем</div>
             )}
-          </div>
+          </AnswerFeedback>
         )}
       </div>
       <div className="study-footer">

@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { buildDrills } from '../lib/morphology';
 import { daySeed, recordAnswer } from '../lib/daily';
-import SpeakButton from './SpeakButton';
-
-const KG_LETTERS = ['ң', 'ө', 'ү'];
-const norm = (s: string) => s.toLowerCase().trim();
+import { norm } from '../lib/study-utils';
+import KgTextInput from './KgTextInput';
+import AnswerFeedback from './AnswerFeedback';
 
 interface Props {
   count?: number;
@@ -19,7 +18,6 @@ export default function Drills({ count = 6, types, onComplete }: Props) {
   const [value, setValue] = useState('');
   const [answered, setAnswered] = useState<null | boolean>(null);
   const [score, setScore] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const finished = drills.length > 0 && index >= drills.length;
   useEffect(() => {
@@ -43,18 +41,6 @@ export default function Drills({ count = 6, types, onComplete }: Props) {
     setIndex((i) => i + 1);
   }
 
-  function insertLetter(ch: string) {
-    const el = inputRef.current;
-    if (!el) return;
-    const start = el.selectionStart ?? value.length;
-    const end = el.selectionEnd ?? value.length;
-    setValue(value.slice(0, start) + ch + value.slice(end));
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(start + 1, start + 1);
-    });
-  }
-
   if (index >= drills.length) {
     return (
       <div className="study-summary">
@@ -69,30 +55,9 @@ export default function Drills({ count = 6, types, onComplete }: Props) {
       <div className="study-card">
         <div className="prompt-label">{drill.task} <span className="study-meta">(напр., {drill.hint})</span></div>
         <div className="prompt-kg">{drill.word} → ?</div>
-        <div className="typed">
-          <input
-            ref={inputRef}
-            type="text"
-            value={value}
-            disabled={answered !== null}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && answered === null) submit(); }}
-            placeholder="кыргызча…"
-            autoCapitalize="off"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-          <div className="typed-tools">
-            {KG_LETTERS.map((ch) => (
-              <button key={ch} className="kbd-btn" onClick={() => insertLetter(ch)} disabled={answered !== null}>{ch}</button>
-            ))}
-            {answered === null && <button className="btn" onClick={submit}>Проверить</button>}
-          </div>
-        </div>
+        <KgTextInput value={value} onChange={setValue} onSubmit={submit} disabled={answered !== null} />
         {answered !== null && (
-          <div className={`study-feedback ${answered ? 'ok' : 'bad'}`}>
-            {answered ? '✓ Верно' : `✗ Правильно: ${drill.answer}`} <SpeakButton text={drill.answer} />
-          </div>
+          <AnswerFeedback correct={answered} answer={drill.answer} speakText={drill.answer} />
         )}
       </div>
       <div className="study-footer">

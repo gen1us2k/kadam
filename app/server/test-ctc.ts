@@ -3,17 +3,12 @@
 
 import { readFileSync } from 'node:fs';
 import { softmaxRows, greedyDecode, forcedAlignGop } from './ctc.ts';
+import { createChecker } from './test-util.ts';
 
 const fx = JSON.parse(readFileSync(new URL('../scripts/ctc-fixture.json', import.meta.url), 'utf8'));
 const { frames, vocab, logits, vocabMap, blank, delimiter, targetIds, expectedGreedy, expectedGop, expectedPercent } = fx;
 
-let fail = 0;
-const check = (name: string, cond: boolean, got?: unknown, want?: unknown) => {
-  if (!cond) {
-    fail++;
-    console.log('FAIL:', name, '| got', got, '| want', want);
-  }
-};
+const { check, done } = createChecker();
 
 const idToToken = new Map<number, string>();
 for (const [tok, id] of Object.entries(vocabMap as Record<string, number>)) idToToken.set(id as number, tok);
@@ -46,5 +41,4 @@ check('zero frames -> []', forcedAlignGop(probs, 0, vocab, targetIds as number[]
 check('single-token target aligns', forcedAlignGop(probs, frames, vocab, [targetIds[0]], blank).length === 1);
 
 console.log(`parity: greedy=${JSON.stringify(greedy)} percent=${percent} maxGopDiff=${maxDiff.toExponential(2)}`);
-console.log(fail === 0 ? 'ALL TESTS PASSED' : `${fail} TEST(S) FAILED`);
-process.exit(fail === 0 ? 0 : 1);
+done('ALL TESTS PASSED');
