@@ -2,12 +2,16 @@
 // this module owns card state, persistence (with migration from the old Leitner store),
 // queue building (interleaved daily mix) and deck statistics.
 
-import { fsrsInit, fsrsReview, fsrsInterval, retrievability } from './fsrs';
-import type { Grade } from './fsrs';
-import { loadJson, saveJson } from './storage';
-import { shuffle } from './study-utils';
+import { fsrsInit, fsrsReview, fsrsInterval, retrievability } from './fsrs.ts';
+import type { Grade } from './fsrs.ts';
+import { loadJson, saveJson } from './storage.ts';
+import { shuffle } from './study-utils.ts';
+import { cardId } from './vocab-parse.ts';
 
-export type { Grade } from './fsrs';
+export type { Grade } from './fsrs.ts';
+// cardId lives with the vocabulary parser (the dedupe key and the card key must stay one
+// definition); re-exported here so existing importers keep their import path.
+export { cardId };
 
 export interface CardState {
   /** FSRS stability (days). */
@@ -64,11 +68,6 @@ export function retention(state: CardState | undefined, now: number): number {
 /** Throttle new-card intake as the review backlog grows, to keep daily load sustainable. */
 export function adaptiveNewLimit(dueCount: number, base = BASE_NEW): number {
   return Math.max(0, base - Math.floor(dueCount / 2));
-}
-
-/** Stable identity for a card. kg alone can collide (homographs), so pair it with ru. */
-export function cardId(card: Pick<DeckCard, 'kg' | 'ru'>): string {
-  return `${card.kg}|${card.ru}`;
 }
 
 /**

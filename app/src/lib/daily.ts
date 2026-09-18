@@ -10,7 +10,7 @@ export interface DayEntry {
   r?: number;
 }
 
-import { saveJson } from './storage';
+import { saveJson } from './storage.ts';
 
 export interface DailyState {
   /** Local date "YYYY-MM-DD" the counters belong to. */

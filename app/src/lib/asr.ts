@@ -5,7 +5,7 @@
 // forced-alignment GOP) runs server-side, locked to the shared reference fixture
 // (scripts/ctc-fixture.json <-> server/test-ctc.ts).
 
-import { encodeWav } from './audio';
+import { encodeWav } from './audio.ts';
 
 const API_URL = `${import.meta.env.BASE_URL}api/asr/analyze`;
 

@@ -8,7 +8,7 @@
 // Each tag carries exactly 15 sentences; the journey station shows all 15.
 // ⚠️ Model-authored — worth a native-speaker review before trusting every form.
 
-import { rng } from './study-utils';
+import { pickDeterministic } from './study-utils.ts';
 
 export interface Sentence {
   /** Russian prompt to translate/assemble. */
@@ -227,13 +227,5 @@ export const SENTENCES: Sentence[] = [
 
 /** Deterministic sentence set for a seed; optional step-tag filter. */
 export function pickSentences(count: number, seed: number, tag?: string): Sentence[] {
-  const pool = tag ? SENTENCES.filter((s) => s.tag === tag) : SENTENCES;
-  if (pool.length <= count) return pool;
-  const next = rng(seed);
-  const idx = [...pool.keys()];
-  for (let i = idx.length - 1; i > 0; i--) {
-    const j = next() % (i + 1);
-    [idx[i], idx[j]] = [idx[j], idx[i]];
-  }
-  return idx.slice(0, count).map((i) => pool[i]);
+  return pickDeterministic(tag ? SENTENCES.filter((s) => s.tag === tag) : SENTENCES, count, seed);
 }

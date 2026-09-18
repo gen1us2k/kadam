@@ -74,6 +74,50 @@ ReadWritePaths=$APP_DIR
 WantedBy=multi-user.target
 UNIT
 
+log "writing telegram bot systemd unit"
+cat > /etc/systemd/system/kadam-bot.service <<UNIT
+[Unit]
+Description=Kadam Telegram bot (daily Kyrgyz task)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$APP_USER
+WorkingDirectory=$APP_DIR/app
+ExecStart=/usr/bin/node server/bot.ts
+Environment=NODE_ENV=production
+Environment=TZ=Asia/Bishkek
+Environment=TELEGRAM_SEND_AT=09:00
+Environment=TELEGRAM_STATE_FILE=/var/lib/kadam/bot-state.json
+# The token never goes through rsync (deploy.sh excludes .env) — put it here, root-owned 0600:
+#   printf 'TELEGRAM_BOT_TOKEN=123:ABC\n' > /etc/kadam-bot.env && chmod 600 /etc/kadam-bot.env
+EnvironmentFile=-/etc/kadam-bot.env
+Restart=on-failure
+RestartSec=10
+# A missing or revoked token is a configuration error, not a crash: bot.ts exits 78 (sysexits
+# EX_CONFIG) and this line stops the restart. Without it the unit would restart every 10 s forever —
+# RestartSec=10 never trips the default StartLimitBurst=5 within StartLimitIntervalSec=10s, and a
+# droplet provisioned before /etc/kadam-bot.env exists is exactly that state.
+# 78 and NOT 1 on purpose: Node exits 1 on any uncaught exception, so listing 1 here would also
+# park the unit after an ordinary transient crash (a full disk in saveState, say) instead of
+# restarting it. Code 1 stays restartable.
+RestartPreventExitStatus=78
+# Subscribers live in /var/lib/kadam — systemd creates it, chowns it to User= and keeps it OUT of
+# the rsync tree, so a deploy cannot wipe them.
+StateDirectory=kadam
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# No ReadWritePaths: StateDirectory already grants /var/lib/kadam, and the bot writes nothing else.
+# Granting \$APP_DIR would let a dropped TELEGRAM_STATE_FILE silently fall back to
+# app/data/bot-state.json — back inside the rsync --delete tree.
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
 log "writing Caddyfile (domain: $DOMAIN)"
 if [[ "$DOMAIN" == "_" || -z "$DOMAIN" ]]; then
   SITE=":80"
@@ -96,6 +140,7 @@ ufw --force enable >/dev/null
 log "enabling services (kadam starts after the first deploy.sh)"
 systemctl daemon-reload
 systemctl enable kadam >/dev/null
+systemctl enable kadam-bot >/dev/null
 systemctl restart caddy
 
 log "done. Now from your laptop:  deploy/deploy.sh root@<droplet-ip>"

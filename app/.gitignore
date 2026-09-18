@@ -4,6 +4,9 @@ dist/
 .venv/
 .env
 
+# Состояние Telegram-бота (подписчики) — локальная разработка.
+data/
+
 # Large ONNX model weights (ASR + TTS) — gitignored (>100 MB). Fetch them with
 # `npm run fetch-models` (scripts/fetch-models.sh); see README.
 models/**/*.onnx

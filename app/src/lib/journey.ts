@@ -1,5 +1,5 @@
-import type { DeckCard } from './srs';
-import { SENTENCES } from './sentences';
+import type { DeckCard } from './srs.ts';
+import { SENTENCES } from './sentences.ts';
 
 export type StepType =
   | 'grammar' | 'vocab' | 'review' | 'corpus' | 'drill' | 'reader' | 'phrases' | 'sentence' | 'exam';

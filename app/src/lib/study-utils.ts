@@ -8,14 +8,24 @@ export const KG_LETTERS = ['ң', 'ө', 'ү'];
 /** Normalize a typed answer for comparison: lowercased, trimmed, internal whitespace collapsed. */
 export const norm = (s: string): string => s.toLowerCase().trim().replace(/\s+/g, ' ');
 
-/** Fisher–Yates shuffle (client-side study queues; uses Math.random). */
-export function shuffle<T>(arr: T[]): T[] {
+/**
+ * Fisher–Yates shuffle. `randInt(n)` yields an integer in [0, n); the default draws from
+ * Math.random (client-side study queues), a seeded source makes the order reproducible.
+ */
+export function shuffle<T>(arr: T[], randInt = (n: number) => Math.floor(Math.random() * n)): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/** Deterministic pick of `count` items from `pool` for a seed — the daily-stable selection. */
+export function pickDeterministic<T>(pool: T[], count: number, seed: number): T[] {
+  if (pool.length <= count) return pool;
+  const next = rng(seed);
+  return shuffle(pool, (n) => next() % n).slice(0, count);
 }
 
 /** xorshift32 — deterministic per seed (matches the drills' daily-stable behaviour). */

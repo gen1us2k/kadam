@@ -48,6 +48,13 @@ deploy/deploy.sh root@<ip>     # rsyncs only the delta, rebuilds, restarts, heal
 
 - Logs: `ssh root@<ip> journalctl -u kadam -f`
 - Restart: `ssh root@<ip> systemctl restart kadam`
+- Droplet provisioned before the Telegram bot existed? Re-run `setup.sh` once (it is idempotent) —
+  that is what writes and enables `kadam-bot.service`; `deploy.sh` alone only restarts it.
+- Bot logs: `ssh root@<ip> journalctl -u kadam-bot -f`
+- Bot token (once, on the droplet — `deploy.sh` never copies `.env`):
+  `printf 'TELEGRAM_BOT_TOKEN=123:ABC\n' > /etc/kadam-bot.env && chmod 600 /etc/kadam-bot.env && systemctl restart kadam-bot`
+- Subscribers live in `/var/lib/kadam/bot-state.json` (systemd `StateDirectory`) — deliberately
+  outside `/opt/kadam`, which `deploy.sh` rsyncs with `--delete`.
 - The app binds `127.0.0.1:4321` (HOST env in the unit) — public traffic only through Caddy; the
   firewall additionally allows just SSH/80/443.
 

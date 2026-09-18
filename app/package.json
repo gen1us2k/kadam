@@ -8,8 +8,9 @@
     "build": "astro build",
     "start": "node server/main.ts",
     "serve": "npm run build && npm start",
+    "bot": "node server/bot.ts",
     "fetch-models": "bash scripts/fetch-models.sh",
-    "test": "node server/test-ctc.ts && node server/test-static.ts && node server/test-tts.ts && node scripts/test-audio.ts",
+    "test": "node server/test-ctc.ts && node server/test-static.ts && node server/test-tts.ts && node server/test-bot.ts && node scripts/test-audio.ts",
     "typecheck": "tsc --noEmit && tsc -p server/tsconfig.json --noEmit"
   },
   "dependencies": {

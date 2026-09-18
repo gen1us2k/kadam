@@ -36,6 +36,11 @@ ssh "$HOST" "bash -euo pipefail -s" <<REMOTE
   sudo -Hu $APP_USER npm ci
   sudo -Hu $APP_USER npm run build
   systemctl restart kadam
+  # The bot is optional. Without /etc/kadam-bot.env it exits 78 and RestartPreventExitStatus=78
+  # keeps systemd from retrying, so the unit simply sits in failed state and the deploy succeeds.
+  # `|| true` also covers droplets provisioned before the bot existed: no unit file there, and
+  # under `set -e` a "unit not found" would abort the deploy before the site health check.
+  systemctl restart kadam-bot || true
   # Wait for health — cold start loads ~470 MB of ONNX + ORT graph init, slow on a 1-vCPU box.
   for i in \$(seq 1 60); do
     if curl -fsS http://127.0.0.1:4321/api/health >/dev/null 2>&1; then echo "[deploy] healthy ✓"; exit 0; fi

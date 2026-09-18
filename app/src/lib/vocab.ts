@@ -1,45 +1,14 @@
+// Браузерная точка входа в словарь: Vite подаёт сырой CSV через `?raw`, разбор живёт в
+// vocab-parse.ts, чтобы тот же парсер мог использовать серверный бот (server/daily-task.ts).
+
 import stepRaw from '../../../anki/kyrgyz-frequency.csv?raw';
 import corpusRaw from '../../../anki/kyrgyz-corpus-b2.csv?raw';
-import { cardId } from './srs';
+import { mergeVocab } from './vocab-parse.ts';
+import type { VocabRow } from './vocab-parse.ts';
 
-export interface VocabRow {
-  kg: string;
-  ru: string;
-  /** Optional Kyrgyz example sentence (corpus rows only). */
-  example?: string;
-  tags: string[];
-}
+export type { VocabRow };
 
-// Rows are comma-separated. The step deck has 3 columns (kg, ru, tags); the B2 corpus has
-// 4 (kg, ru, example, tags). Values are authored without commas; we still reconstruct the
-// middle column defensively in case one slips in. tags are always the last field.
-function parse(raw: string, withExample: boolean): VocabRow[] {
-  return raw
-    .split(/\r?\n/)
-    .filter((line) => line.trim() && !line.startsWith('#'))
-    .map((line) => {
-      const parts = line.split(',');
-      const kg = (parts[0] ?? '').trim();
-      const tags = (parts[parts.length - 1] ?? '').trim().split(/\s+/).filter(Boolean);
-      if (withExample) {
-        const ru = (parts[1] ?? '').trim();
-        const example = parts.slice(2, -1).join(',').trim();
-        return { kg, ru, example: example || undefined, tags };
-      }
-      return { kg, ru: parts.slice(1, -1).join(',').trim(), tags };
-    })
-    .filter((r) => r.kg && r.ru);
-}
-
-// Merge the curated step deck with the frequency corpus; dedupe by kg+ru (step deck wins).
+/** Merge the curated step deck with the frequency corpus; dedupe by kg+ru (step deck wins). */
 export function loadVocab(): VocabRow[] {
-  const seen = new Set<string>();
-  const merged: VocabRow[] = [];
-  for (const row of [...parse(stepRaw, false), ...parse(corpusRaw, true)]) {
-    const id = cardId(row);
-    if (seen.has(id)) continue;
-    seen.add(id);
-    merged.push(row);
-  }
-  return merged;
+  return mergeVocab(stepRaw, corpusRaw);
 }

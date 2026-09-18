@@ -5,7 +5,7 @@
 // stems (the curated DRILL_VERBS); irregular verbs are excluded.
 // ⚠️ Verb forms are model-authored — worth a native-speaker spot-check.
 
-import { rng } from './study-utils';
+import { rng } from './study-utils.ts';
 
 const BACK_UNROUNDED = 'аы';
 const FRONT_UNROUNDED = 'еэи';
