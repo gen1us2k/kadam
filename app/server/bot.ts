@@ -45,8 +45,8 @@ if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(SEND_AT)) {
   process.exit(EX_CONFIG);
 }
 // Load-bearing, not decoration: TypeScript narrows TOKEN to `string` at module scope after the
-// guard above, but that narrowing does not reach into the hoisted function declaration below
-// (handleCommand) — without this binding it sees `string | undefined`.
+// guard above, but that narrowing does not reach into the hoisted function declarations below
+// (handleCommand, sendDailyTask) — without this binding they see `string | undefined`.
 const token: string = TOKEN;
 
 const state = await loadState(STATE_FILE);
@@ -83,21 +83,26 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
  * The in-flight flag is belt-and-braces next to the early lastSentDay claim inside broadcast().
  */
 let broadcasting = false;
+
+// async on purpose: building and rendering the task happen INSIDE the promise, so even a
+// synchronous throw there becomes a rejection the tick's .catch/.finally below still cover —
+// thrown straight from the timer callback it would crash the process with the flag stuck.
+async function sendDailyTask(): Promise<void> {
+  // One clock read: the claimed day, the date inside the message and the log line cannot disagree.
+  const task = buildDailyTask(deck);
+  const r = await broadcast(state, task.day, renderTask(task), {
+    send: (chatId, text) => sendMessage(token, chatId, text),
+    save: (s) => saveState(STATE_FILE, s),
+    log: (line) => console.log(`[bot] ${line}`),
+    gapMs: SEND_GAP_MS,
+  });
+  console.log(`[bot] daily task ${task.day}: ${r.sent} sent, ${r.dropped} dropped, ${r.failed} failed`);
+}
+
 setInterval(() => {
   if (broadcasting || !shouldSend(state, SEND_AT)) return;
   broadcasting = true;
-  // One clock read: the claimed day, the date inside the message and the log line cannot disagree.
-  const task = buildDailyTask(deck);
-  void broadcast(state, task.day, renderTask(task), {
-    send: (chatId, text) => sendMessage(token, chatId, text),
-    save: () => saveState(STATE_FILE, state),
-    gapMs: SEND_GAP_MS,
-  })
-    .then((r) => {
-      for (const line of r.dropped) console.log(`[bot] dropped ${line}`);
-      for (const line of r.failed) console.error(`[bot] send failed ${line}`);
-      console.log(`[bot] daily task ${task.day}: ${r.sent} sent, ${r.dropped.length} dropped, ${r.failed.length} failed`);
-    })
+  void sendDailyTask()
     .catch((e: unknown) => console.error(`[bot] broadcast failed: ${e instanceof Error ? e.message : e}`))
     .finally(() => {
       broadcasting = false;

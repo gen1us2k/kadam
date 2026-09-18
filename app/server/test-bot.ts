@@ -89,8 +89,10 @@ await writeFile(file, '{ this is not json', 'utf8');
 const realError = console.error;
 const logged: unknown[] = [];
 console.error = (...args: unknown[]) => void logged.push(args);
-const broken = await loadState(file);
-console.error = realError;
+// finally: if loadState ever rejects here, later check() failures must still be able to print.
+const broken = await loadState(file).finally(() => {
+  console.error = realError;
+});
 check('corrupt file yields empty state', broken.chats.length === 0 && broken.offset === 0 && broken.lastSentDay === null);
 check('corrupt file is reported, not silent', logged.length === 1, logged);
 await writeFile(file, 'null', 'utf8');
@@ -141,12 +143,16 @@ const result = await broadcast(bState, '2026-09-19', 'task', {
     if (chatId === 1) removeChat(bState, 4); // chat 4 sends /stop while the broadcast is running
     return outcomes[chatId] as Exclude<SendOutcome, { kind: 'retry' }>;
   },
-  save: async () => void events.push(`save:${bState.lastSentDay}`),
+  save: async (s) => void events.push(`save:${s.lastSentDay}:same=${s === bState}`),
+  log: (line) => void events.push(`log:${line}`),
   gapMs: 0,
 });
-check('day is persisted before the first send', events[0] === 'save:2026-09-19' && events[1] === 'send:1:claimed=2026-09-19', events);
-check('state is persisted again after the loop', events.at(-1) === 'save:2026-09-19', events);
-check('counts sent / dropped / failed', result.sent === 1 && result.dropped.length === 1 && result.failed.length === 1, result);
+check('day is persisted before the first send', events[0] === 'save:2026-09-19:same=true' && events[1] === 'send:1:claimed=2026-09-19', events);
+check('state is persisted again after the loop', events.at(-1) === 'save:2026-09-19:same=true', events);
+check('counts sent / dropped / failed', result.sent === 1 && result.dropped === 1 && result.failed === 1, result);
+// Logged the moment it happens (before the next send), so a failing final save cannot eat it.
+check('drop is logged live', events.indexOf('log:dropped 2: blocked') < events.findIndex((e) => e.startsWith('send:3')), events);
+check('failure is logged live', events.includes('log:send to 3 failed: http 500'), events);
 check('gone subscriber is removed, failing one is kept', bState.chats.join() === '1,3', bState.chats);
 check('/stop mid-broadcast is honoured', !events.some((e) => e.startsWith('send:4')), events);
 
@@ -194,6 +200,9 @@ script([rateLimited(0), rateLimited(0)]);
 check('429 twice -> transient, retry never escapes', (await sendMessage('t', 1, 'x')).kind === 'transient' && calls === 2, calls);
 script([rateLimited(3600)]);
 check('flood-wait is skipped, not slept out', (await sendMessage('t', 1, 'x')).kind === 'transient' && calls === 1, calls);
+// Pins the upper side of the 60 s threshold. (The 60 s side would need a real minute-long sleep.)
+script([rateLimited(61)]);
+check('61 s is already too long', (await sendMessage('t', 1, 'x')).kind === 'transient' && calls === 1, calls);
 script([() => { throw new Error('socket hang up'); }]);
 check('network error -> transient', (await sendMessage('t', 1, 'x')).kind === 'transient');
 globalThis.fetch = realFetch;

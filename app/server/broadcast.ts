@@ -7,17 +7,20 @@ import type { sendMessage } from './telegram.ts';
 
 export interface BroadcastDeps {
   send: (chatId: number, text: string) => ReturnType<typeof sendMessage>;
-  save: () => Promise<void>;
+  /** Receives the very state broadcast() mutates, so the two cannot drift apart. */
+  save: (state: BotState) => Promise<void>;
+  /** Called the moment a subscriber is dropped or a send fails — not buffered until the end. */
+  log: (line: string) => void;
   /** Pause between sends — cheap insurance against a 429 storm. */
   gapMs: number;
 }
 
 export interface BroadcastResult {
   sent: number;
-  /** One human-readable line per subscriber Telegram reported as gone (already removed). */
-  dropped: string[];
-  /** One line per transient failure (subscriber kept). */
-  failed: string[];
+  /** Subscribers Telegram reported as gone (already removed from state). */
+  dropped: number;
+  /** Transient failures (subscriber kept). */
+  failed: number;
 }
 
 /**
@@ -38,9 +41,9 @@ export async function broadcast(
   deps: BroadcastDeps,
 ): Promise<BroadcastResult> {
   state.lastSentDay = day;
-  await deps.save();
+  await deps.save(state);
 
-  const result: BroadcastResult = { sent: 0, dropped: [], failed: [] };
+  const result: BroadcastResult = { sent: 0, dropped: 0, failed: 0 };
   for (const chatId of [...state.chats]) {
     // The snapshot can go stale: a /stop that lands mid-broadcast is honoured.
     if (!state.chats.includes(chatId)) continue;
@@ -48,12 +51,14 @@ export async function broadcast(
     if (outcome.kind === 'ok') result.sent++;
     else if (outcome.kind === 'drop') {
       removeChat(state, chatId);
-      result.dropped.push(`${chatId}: ${outcome.reason}`);
+      result.dropped++;
+      deps.log(`dropped ${chatId}: ${outcome.reason}`);
     } else {
-      result.failed.push(`${chatId}: ${outcome.reason}`);
+      result.failed++;
+      deps.log(`send to ${chatId} failed: ${outcome.reason}`);
     }
     await sleep(deps.gapMs);
   }
-  await deps.save();
+  await deps.save(state);
   return result;
 }
