@@ -4,7 +4,7 @@
 // Чтения прощающие: битый или отсутствующий файл даёт пустое состояние — как и клиентский
 // storage.ts, это вспомогательный слой, а не БД.
 
-import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, rename, mkdir, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 // The day string must be byte-identical to the site's, so the format has exactly one definition.
 import { todayStr } from '../src/lib/daily.ts';
@@ -22,18 +22,34 @@ export function emptyState(): BotState {
   return { chats: [], offset: 0, lastSentDay: null };
 }
 
-/** Read state; any missing/corrupt/ill-shaped file yields an empty state. */
+/**
+ * Read state. Only two failures mean "start empty": the file does not exist yet, or it is not
+ * valid JSON (logged — atomic writes make that near-impossible, so it deserves a line in the
+ * journal). Every OTHER read error is rethrown on purpose: swallowing an EACCES would boot the
+ * bot with zero subscribers, and the next save — rename needs only directory permission — would
+ * then succeed and wipe the real list for good.
+ */
 export async function loadState(path: string): Promise<BotState> {
+  let raw: string;
   try {
-    const parsed = JSON.parse(await readFile(path, 'utf8')) as Partial<BotState>;
-    return {
-      chats: Array.isArray(parsed.chats) ? parsed.chats.filter((c) => Number.isFinite(c)) : [],
-      offset: Number.isFinite(parsed.offset) ? Number(parsed.offset) : 0,
-      lastSentDay: typeof parsed.lastSentDay === 'string' ? parsed.lastSentDay : null,
-    };
+    raw = await readFile(path, 'utf8');
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return emptyState();
+    throw e;
+  }
+  let parsed: Partial<BotState>;
+  try {
+    // `?? {}`: a literal `null` is valid JSON but has no fields to read.
+    parsed = (JSON.parse(raw) ?? {}) as Partial<BotState>;
   } catch {
+    console.error(`[bot] state file ${path} is not valid JSON — starting with an empty state`);
     return emptyState();
   }
+  return {
+    chats: Array.isArray(parsed.chats) ? parsed.chats.filter((c) => Number.isFinite(c)) : [],
+    offset: Number.isFinite(parsed.offset) ? Number(parsed.offset) : 0,
+    lastSentDay: typeof parsed.lastSentDay === 'string' ? parsed.lastSentDay : null,
+  };
 }
 
 /** Serialises writes; poll() and broadcast() both call saveState and interleave across awaits. */
@@ -45,8 +61,14 @@ async function writeAtomic(path: string, data: string): Promise<void> {
   // Unique per write: a shared tmp name lets a second writer's rename hit ENOENT once the first
   // one has already moved the file away.
   const tmp = `${path}.${process.pid}.${++seq}.tmp`;
-  await writeFile(tmp, data, 'utf8');
-  await rename(tmp, path);
+  try {
+    await writeFile(tmp, data, 'utf8');
+    await rename(tmp, path);
+  } catch (e) {
+    // Unique names never get overwritten, so a failed write must clean up after itself.
+    await unlink(tmp).catch(() => {});
+    throw e;
+  }
 }
 
 /**

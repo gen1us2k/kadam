@@ -2,6 +2,8 @@
 // зависимость не нужна. Классификация ответа вынесена в чистые функции: именно они решают,
 // удалять ли подписчика и стоит ли продолжать опрос, и именно они покрыты тестами без сети.
 
+import { setTimeout as sleep } from 'node:timers/promises';
+
 const API = 'https://api.telegram.org';
 
 export interface TelegramUpdate {
@@ -62,7 +64,8 @@ async function callApi(token: string, method: string, payload: unknown, signal?:
   return { status: res.status, body };
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** Longest retry_after worth waiting out inline; beyond it the chat is skipped for this cycle. */
+const MAX_RETRY_AFTER_SEC = 60;
 
 /**
  * Send one HTML message. Retries once on 429, then reports the outcome to the caller.
@@ -86,6 +89,11 @@ export async function sendMessage(
   };
   const first = await attempt();
   if (first.kind !== 'retry') return first;
+  // A flood-wait can ask for minutes. Sleeping it out would park the whole broadcast inside one
+  // subscriber's send — the same stall every AbortSignal here exists to prevent.
+  if (first.seconds > MAX_RETRY_AFTER_SEC) {
+    return { kind: 'transient', reason: `rate limited, retry_after ${first.seconds}s is too long` };
+  }
   await sleep(first.seconds * 1000);
   const second = await attempt();
   // `retry` never escapes: the return type makes the caller's outcome handling exhaustive.

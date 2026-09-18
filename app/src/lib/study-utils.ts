@@ -23,7 +23,7 @@ export function shuffle<T>(arr: T[], randInt = (n: number) => Math.floor(Math.ra
 
 /** Deterministic pick of `count` items from `pool` for a seed — the daily-stable selection. */
 export function pickDeterministic<T>(pool: T[], count: number, seed: number): T[] {
-  if (pool.length <= count) return pool;
+  if (pool.length <= count) return [...pool]; // a copy, like shuffle() — never the caller's array
   const next = rng(seed);
   return shuffle(pool, (n) => next() % n).slice(0, count);
 }

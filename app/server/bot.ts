@@ -5,8 +5,10 @@
 // Время отправки — в локальной зоне процесса; на сервере её задаёт TZ в systemd-юните.
 
 import { fileURLToPath } from 'node:url';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { buildDailyTask, loadDeck, renderTask } from './daily-task.ts';
 import { addChat, loadState, removeChat, saveState, shouldSend } from './bot-state.ts';
+import { broadcast } from './broadcast.ts';
 import { getUpdates, sendMessage } from './telegram.ts';
 
 // Optional app/.env for the token / send time / state path (see .env.example). Real env vars win.
@@ -36,13 +38,15 @@ if (!TOKEN) {
   console.error('TELEGRAM_BOT_TOKEN is not set — nothing to do. See app/.env.example.');
   process.exit(EX_CONFIG);
 }
-if (!/^\d{2}:\d{2}$/.test(SEND_AT)) {
-  console.error(`TELEGRAM_SEND_AT must be HH:MM, got ${JSON.stringify(SEND_AT)}`);
+// Range-checked, not just shaped: shouldSend compares "HH:MM" strings, so an accepted "25:61"
+// would never compare true and the bot would silently never send.
+if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(SEND_AT)) {
+  console.error(`TELEGRAM_SEND_AT must be HH:MM (00:00–23:59), got ${JSON.stringify(SEND_AT)}`);
   process.exit(EX_CONFIG);
 }
 // Load-bearing, not decoration: TypeScript narrows TOKEN to `string` at module scope after the
-// guard above, but that narrowing does not reach into the hoisted function declarations below
-// (handleCommand, broadcast) — without this binding they see `string | undefined`.
+// guard above, but that narrowing does not reach into the hoisted function declaration below
+// (handleCommand) — without this binding it sees `string | undefined`.
 const token: string = TOKEN;
 
 const state = await loadState(STATE_FILE);
@@ -51,8 +55,6 @@ console.log(
   `[bot] up — ${state.chats.length} subscriber(s), daily task at ${SEND_AT} ` +
     `(${Intl.DateTimeFormat().resolvedOptions().timeZone}), deck ${deck.length} words, state ${STATE_FILE}`,
 );
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const GREETING =
   'Салам! Раз в сутки я буду присылать задание по кыргызскому: предложение на сборку, ' +
@@ -75,51 +77,27 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
 }
 
 /**
- * Broadcast the day's task, dropping subscribers Telegram reports as gone.
- *
- * lastSentDay is claimed BEFORE the first send, not after the loop: the scheduler tick reads that
- * very field, and a broadcast slower than one tick would otherwise re-enter and send the task
- * twice to everyone. It is not a hypothetical — SEND_GAP_MS caps throughput at 20 chats/second,
- * and a single 429 with retry_after: 30 outlasts the tick on its own.
- * The trade: a crash mid-broadcast skips the rest of that day rather than re-sending to everyone
- * who already got it. For a study reminder that is the cheaper failure.
- */
-async function broadcast(): Promise<void> {
-  // One clock read: the claimed day, the date inside the message and the log line cannot disagree.
-  const task = buildDailyTask(deck);
-  state.lastSentDay = task.day;
-  await saveState(STATE_FILE, state);
-
-  const text = renderTask(task);
-  let sent = 0;
-  let dropped = 0;
-  for (const chatId of [...state.chats]) {
-    const outcome = await sendMessage(token, chatId, text);
-    if (outcome.kind === 'ok') sent++;
-    else if (outcome.kind === 'drop') {
-      removeChat(state, chatId);
-      dropped++;
-      console.log(`[bot] dropped ${chatId}: ${outcome.reason}`);
-    } else {
-      console.error(`[bot] send to ${chatId} failed: ${outcome.reason}`);
-    }
-    await sleep(SEND_GAP_MS);
-  }
-  await saveState(STATE_FILE, state);
-  console.log(`[bot] daily task ${task.day}: ${sent} sent, ${dropped} dropped`);
-}
-
-/**
  * Scheduler: a 60-second tick guarded by a persisted lastSentDay. Cheaper to reason about than a
  * setTimeout to the next 09:00, survives restarts, and catches up after downtime — if the box was
  * down at 09:00 and comes back at 11:00, the task goes out at 11:00 rather than being skipped.
- * The in-flight flag is belt-and-braces next to the early lastSentDay claim above.
+ * The in-flight flag is belt-and-braces next to the early lastSentDay claim inside broadcast().
  */
 let broadcasting = false;
 setInterval(() => {
   if (broadcasting || !shouldSend(state, SEND_AT)) return;
   broadcasting = true;
-  void broadcast()
+  // One clock read: the claimed day, the date inside the message and the log line cannot disagree.
+  const task = buildDailyTask(deck);
+  void broadcast(state, task.day, renderTask(task), {
+    send: (chatId, text) => sendMessage(token, chatId, text),
+    save: () => saveState(STATE_FILE, state),
+    gapMs: SEND_GAP_MS,
+  })
+    .then((r) => {
+      for (const line of r.dropped) console.log(`[bot] dropped ${line}`);
+      for (const line of r.failed) console.error(`[bot] send failed ${line}`);
+      console.log(`[bot] daily task ${task.day}: ${r.sent} sent, ${r.dropped.length} dropped, ${r.failed.length} failed`);
+    })
     .catch((e: unknown) => console.error(`[bot] broadcast failed: ${e instanceof Error ? e.message : e}`))
     .finally(() => {
       broadcasting = false;
@@ -133,7 +111,10 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     if (stopping) return;
     stopping = true;
-    console.log(`[bot] ${signal} — persisting state and exiting`);
+    // Deploying at the send hour cuts a broadcast short; lastSentDay is already claimed, so the
+    // remaining subscribers are skipped for today. Say so — otherwise it is invisible.
+    const cut = broadcasting ? ' mid-broadcast (the rest of today\'s sends are skipped)' : '';
+    console.log(`[bot] ${signal}${cut} — persisting state and exiting`);
     void saveState(STATE_FILE, state).finally(() => process.exit(0));
   });
 }

@@ -80,6 +80,12 @@ cat > /etc/systemd/system/kadam-bot.service <<UNIT
 Description=Kadam Telegram bot (daily Kyrgyz task)
 After=network-online.target
 Wants=network-online.target
+# The defaults (5 starts per 10 s) can never trip with RestartSec=10, so a PERMANENT non-config
+# failure — unreadable anki/*.csv, a state file the service user cannot read — would restart
+# every 10 s forever. Five failed starts in five minutes now park the unit in failed state,
+# where systemctl status shows it.
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -96,9 +102,8 @@ EnvironmentFile=-/etc/kadam-bot.env
 Restart=on-failure
 RestartSec=10
 # A missing or revoked token is a configuration error, not a crash: bot.ts exits 78 (sysexits
-# EX_CONFIG) and this line stops the restart. Without it the unit would restart every 10 s forever —
-# RestartSec=10 never trips the default StartLimitBurst=5 within StartLimitIntervalSec=10s, and a
-# droplet provisioned before /etc/kadam-bot.env exists is exactly that state.
+# EX_CONFIG) and this line stops the restart at once, without burning through the start limit.
+# A droplet provisioned before /etc/kadam-bot.env exists is exactly that state.
 # 78 and NOT 1 on purpose: Node exits 1 on any uncaught exception, so listing 1 here would also
 # park the unit after an ordinary transient crash (a full disk in saveState, say) instead of
 # restarting it. Code 1 stays restartable.
