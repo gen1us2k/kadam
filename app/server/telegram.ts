@@ -9,10 +9,18 @@ const API = 'https://api.telegram.org';
 export interface TelegramUpdate {
   update_id: number;
   message?: { chat: { id: number }; text?: string };
+  callback_query?: {
+    id: string;
+    data?: string;
+    message?: { chat: { id: number }; message_id: number };
+  };
 }
 
+/** Ряды кнопок. Подпись — то, что видит пользователь; data вернётся в callback_query. */
+export type Keyboard = { text: string; callback_data: string }[][];
+
 export type SendOutcome =
-  | { kind: 'ok' }
+  | { kind: 'ok'; messageId: number }
   /** 429 — wait this many seconds, then retry once. */
   | { kind: 'retry'; seconds: number }
   /** The chat is gone for good (blocked, kicked, deleted) — drop the subscriber. */
@@ -34,7 +42,11 @@ export interface ApiBody {
 
 /** Map an HTTP status + parsed body onto the action the caller must take. Pure. */
 export function classifyResponse(status: number, body: ApiBody): SendOutcome {
-  if (status === 200 && body.ok) return { kind: 'ok' };
+  if (status === 200 && body.ok) {
+    // message_id нужен, чтобы дальше редактировать это же сообщение всю сессию.
+    const id = (body as ApiBody & { result?: { message_id?: number } }).result?.message_id;
+    return { kind: 'ok', messageId: Number.isFinite(id) ? Number(id) : 0 };
+  }
   const reason = body.description ?? `http ${status}`;
   if (status === 429) return { kind: 'retry', seconds: body.parameters?.retry_after ?? 1 };
   if (status === 403) return { kind: 'drop', reason };
@@ -77,8 +89,15 @@ export async function sendMessage(
   token: string,
   chatId: number,
   text: string,
+  keyboard?: Keyboard,
 ): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
-  const payload = { chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true };
+  const payload = {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
+  };
   const attempt = async (): Promise<SendOutcome> => {
     try {
       const { status, body } = await callApi(token, 'sendMessage', payload, AbortSignal.timeout(15_000));
@@ -110,12 +129,57 @@ export async function getUpdates(token: string, offset: number, timeoutSec = 25)
     const { status, body } = await callApi(
       token,
       'getUpdates',
-      { offset, timeout: timeoutSec, allowed_updates: ['message'] },
+      { offset, timeout: timeoutSec, allowed_updates: ['message', 'callback_query'] },
       // The long poll holds the connection for timeoutSec; give it a margin, then give up.
       AbortSignal.timeout((timeoutSec + 10) * 1000),
     );
     return classifyPoll(status, body as ApiBody & { result?: TelegramUpdate[] });
   } catch (e) {
     return { kind: 'transient', reason: e instanceof Error ? e.message : 'network error' };
+  }
+}
+
+/**
+ * Заменить текст и кнопки уже отправленного сообщения. Вся сессия живёт в одном сообщении,
+ * поэтому это основной способ показать следующий вопрос.
+ */
+export async function editMessageText(
+  token: string,
+  chatId: number,
+  messageId: number,
+  text: string,
+  keyboard?: Keyboard,
+): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
+  const payload = {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+    reply_markup: { inline_keyboard: keyboard ?? [] },
+  };
+  try {
+    const { status, body } = await callApi(token, 'editMessageText', payload, AbortSignal.timeout(15_000));
+    const outcome = classifyResponse(status, body);
+    return outcome.kind === 'retry' ? { kind: 'transient', reason: 'rate limited' } : outcome;
+  } catch (e) {
+    return { kind: 'transient', reason: e instanceof Error ? e.message : 'network error' };
+  }
+}
+
+/**
+ * Погасить спиннер на кнопке. Без этого вызова клиент крутит его около тридцати секунд, и
+ * пользователь считает, что бот завис. Ответ намеренно игнорируется: это уведомление, а не шаг.
+ */
+export async function answerCallback(token: string, callbackId: string, text?: string): Promise<void> {
+  try {
+    await callApi(
+      token,
+      'answerCallbackQuery',
+      { callback_query_id: callbackId, ...(text ? { text } : {}) },
+      AbortSignal.timeout(15_000),
+    );
+  } catch {
+    /* уведомление, а не шаг сессии: сбой здесь не должен ничего ронять */
   }
 }

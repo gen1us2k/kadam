@@ -50,6 +50,10 @@ deploy/deploy.sh root@<ip>     # rsyncs only the delta, rebuilds, restarts, heal
 - Restart: `ssh root@<ip> systemctl restart kadam`
 - Droplet provisioned before the Telegram bot existed? Re-run `setup.sh` once (it is idempotent) —
   that is what writes and enables `kadam-bot.service`; `deploy.sh` alone only restarts it.
+- Обновление с версии до практики мигрирует файл состояния само: старый `chats: [id, …]`
+  превращается в карту чатов, а прежний общий `lastSentDay` раздаётся каждому чату, чтобы в день
+  обновления никто не получил задание дважды. Откат на старый код после этого потребует удалить
+  `/var/lib/kadam/bot-state.json` — старая версия новый формат не прочитает.
 - Bot logs: `ssh root@<ip> journalctl -u kadam-bot -f`
 - Bot token (once, on the droplet — `deploy.sh` never copies `.env`):
   `printf 'TELEGRAM_BOT_TOKEN=123:ABC\n' > /etc/kadam-bot.env && chmod 600 /etc/kadam-bot.env && systemctl restart kadam-bot`

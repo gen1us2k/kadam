@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { pickSentences } from '../lib/sentences';
-import { rng } from '../lib/study-utils';
+import { makeBank } from '../lib/study-utils';
 import { daySeed, recordAnswer } from '../lib/daily';
 import SpeakPractice from './SpeakPractice';
 import AnswerFeedback from './AnswerFeedback';
@@ -11,26 +11,6 @@ interface Props {
   count?: number;
   /** Fired once when the set is finished (e.g. to mark a journey station done). */
   onComplete?: () => void;
-}
-
-interface Chip {
-  w: string;
-  id: number;
-}
-
-/** Shuffle the words into a bank; avoid handing back the already-correct order. */
-function makeBank(words: string[], seed: number): Chip[] {
-  const chips = words.map((w, id) => ({ w, id }));
-  if (chips.length < 2) return chips;
-  const next = rng(seed);
-  for (let attempt = 0; attempt < 6; attempt++) {
-    for (let i = chips.length - 1; i > 0; i--) {
-      const j = next() % (i + 1);
-      [chips[i], chips[j]] = [chips[j], chips[i]];
-    }
-    if (chips.some((c, i) => c.id !== i)) break; // not the original order
-  }
-  return chips;
 }
 
 /** Sentence-building drill: reassemble a Kyrgyz sentence (SOV) from a shuffled word bank. */

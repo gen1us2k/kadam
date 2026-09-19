@@ -21,6 +21,27 @@ export function shuffle<T>(arr: T[], randInt = (n: number) => Math.floor(Math.ra
   return a;
 }
 
+/** Слово банка для сборки предложения: id — позиция в исходном порядке. */
+export interface Chip {
+  w: string;
+  id: number;
+}
+
+/** Shuffle the words into a bank; avoid handing back the already-correct order. */
+export function makeBank(words: string[], seed: number): Chip[] {
+  const chips = words.map((w, id) => ({ w, id }));
+  if (chips.length < 2) return chips;
+  const next = rng(seed);
+  for (let attempt = 0; attempt < 6; attempt++) {
+    for (let i = chips.length - 1; i > 0; i--) {
+      const j = next() % (i + 1);
+      [chips[i], chips[j]] = [chips[j], chips[i]];
+    }
+    if (chips.some((c, i) => c.id !== i)) break; // not the original order
+  }
+  return chips;
+}
+
 /** Deterministic pick of `count` items from `pool` for a seed — the daily-stable selection. */
 export function pickDeterministic<T>(pool: T[], count: number, seed: number): T[] {
   if (pool.length <= count) return [...pool]; // a copy, like shuffle() — never the caller's array

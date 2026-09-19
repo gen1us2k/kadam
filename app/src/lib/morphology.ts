@@ -5,7 +5,7 @@
 // stems (the curated DRILL_VERBS); irregular verbs are excluded.
 // ⚠️ Verb forms are model-authored — worth a native-speaker spot-check.
 
-import { rng } from './study-utils.ts';
+import { rng, shuffle } from './study-utils.ts';
 
 const BACK_UNROUNDED = 'аы';
 const FRONT_UNROUNDED = 'еэи';
@@ -46,52 +46,84 @@ function highVowel(word: string): 'ы' | 'и' | 'у' | 'ү' {
 const endsVoiceless = (word: string) => VOICELESS.includes(word[word.length - 1]?.toLowerCase() ?? '');
 const endsVowel = (word: string) => VOWELS.includes(word[word.length - 1]?.toLowerCase() ?? '');
 
-/** Множественное число: -лар/-дар/-тар × 4 гласных. */
-function plural(word: string): string {
-  const v = lowVowel(word);
-  const last = word[word.length - 1]?.toLowerCase() ?? '';
-  let c: string;
-  if (endsVowel(word) || last === 'й' || last === 'р') c = 'л';
-  else if (endsVoiceless(word)) c = 'т';
-  else c = 'д';
-  return `${word}${c}${v}р`;
+const LOW_VOWELS = ['а', 'е', 'о', 'ө'] as const;
+const HIGH_VOWELS = ['ы', 'и', 'у', 'ү'] as const;
+
+/**
+ * Форма суффикса как данные: слово + согласная + гласная + хвост. Держать её таблицей, а не
+ * восемью функциями, нужно ради дистракторов: неверный вариант — это тот же суффикс с другой
+ * согласной или гласной, и выводить его из второй копии правил значило бы дать им разойтись.
+ */
+interface Suffix {
+  /** Согласная по ассимиляции. Пустая строка — у суффиксов, которые начинаются с гласной. */
+  cons: (word: string) => string;
+  /** Все согласные этого суффикса: первая — для верной формы, остальные дают дистракторы. */
+  consVariants: readonly string[];
+  vowel: (word: string) => string;
+  vowelVariants: readonly string[];
+  tail: string;
 }
+
+/** Множественное число: -лар/-дар/-тар × 4 гласных. */
+const PLURAL: Suffix = {
+  cons: (w) => {
+    const last = w[w.length - 1]?.toLowerCase() ?? '';
+    if (endsVowel(w) || last === 'й' || last === 'р') return 'л';
+    return endsVoiceless(w) ? 'т' : 'д';
+  },
+  consVariants: ['л', 'т', 'д'],
+  vowel: lowVowel,
+  vowelVariants: LOW_VOWELS,
+  tail: 'р',
+};
+const voicedPair = (voiced: string, voiceless: string) => ({
+  cons: (w: string) => (endsVoiceless(w) ? voiceless : voiced),
+  consVariants: [voiced, voiceless] as const,
+});
+const NO_CONS = { cons: () => '', consVariants: [''] as const };
 
 /** Жатыш (где): -да/-та × 4 гласных. */
-function locative(word: string): string {
-  return `${word}${endsVoiceless(word) ? 'т' : 'д'}${lowVowel(word)}`;
-}
-
+const LOCATIVE: Suffix = { ...voicedPair('д', 'т'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: '' };
 /** Барыш (куда): -га/-ка × 4 гласных. */
-function dative(word: string): string {
-  return `${word}${endsVoiceless(word) ? 'к' : 'г'}${lowVowel(word)}`;
-}
-
+const DATIVE: Suffix = { ...voicedPair('г', 'к'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: '' };
 /** Чыгыш (откуда): -дан/-тан × 4 гласных. */
-function ablative(word: string): string {
-  return `${word}${endsVoiceless(word) ? 'т' : 'д'}${lowVowel(word)}н`;
-}
+const ABLATIVE: Suffix = { ...voicedPair('д', 'т'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: 'н' };
 
 // --- Глагол, 3-е лицо ед. числа (регулярные основы на согласную). ---
 
 /** Настоящее время (сейчас): деепричастие -ып + жатат. бар → барып жатат. */
-function presentCont(verb: string): string {
-  return `${verb}${highVowel(verb)}п жатат`;
-}
-
+const PRESENT_CONT: Suffix = { ...NO_CONS, vowel: highVowel, vowelVariants: HIGH_VOWELS, tail: 'п жатат' };
 /** Прошедшее определённое: -ды/-ти. бар → барды, кет → кетти. */
-function pastTense(verb: string): string {
-  return `${verb}${endsVoiceless(verb) ? 'т' : 'д'}${highVowel(verb)}`;
-}
-
+const PAST: Suffix = { ...voicedPair('д', 'т'), vowel: highVowel, vowelVariants: HIGH_VOWELS, tail: '' };
 /** Настоящее-будущее (аорист): -ат. бар → барат, кел → келет. */
-function futureAorist(verb: string): string {
-  return `${verb}${lowVowel(verb)}т`;
-}
-
+const AORIST: Suffix = { ...NO_CONS, vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: 'т' };
 /** Отрицание аориста: -байт/-пайт. бар → барбайт, кет → кетпейт. */
-function negAorist(verb: string): string {
-  return `${verb}${endsVoiceless(verb) ? 'п' : 'б'}${lowVowel(verb)}йт`;
+const NEG_AORIST: Suffix = { ...voicedPair('б', 'п'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: 'йт' };
+
+/** Верная форма: согласная и гласная выбраны по гармонии и ассимиляции. */
+const inflect = (s: Suffix, word: string): string => `${word}${s.cons(word)}${s.vowel(word)}${s.tail}`;
+
+/**
+ * Неверные формы этого суффикса, разложенные по двум осям ошибки.
+ *
+ * Перебирать все комбинации подряд нельзя: список получается согласно-мажорным, и первые три
+ * варианта всегда оказываются на одной оси. Для звонкой основы `үй` это дало бы `үйга/үйге/үйго`
+ * — одна гармония, и ассимиляция не проверяется вовсе; для глухой `ат` — наоборот. Поэтому оси
+ * разделены, а выбор из них делает вызывающий код.
+ */
+function wrongForms(s: Suffix, word: string): { harmony: string[]; assimilation: string[] } {
+  const correct = inflect(s, word);
+  const c = s.cons(word);
+  const v = s.vowel(word);
+  const harmony = s.vowelVariants
+    .filter((x) => x !== v)
+    .map((x) => `${word}${c}${x}${s.tail}`)
+    .filter((f) => f !== correct);
+  const assimilation = s.consVariants
+    .filter((x) => x !== c)
+    .map((x) => `${word}${x}${v}${s.tail}`)
+    .filter((f) => f !== correct);
+  return { harmony, assimilation };
 }
 
 export interface Drill {
@@ -106,7 +138,7 @@ export interface Drill {
 interface DrillType {
   task: string;
   hint: string;
-  make: (w: string) => string;
+  suffix: Suffix;
   /** Word pool this drill inflects (nouns for cases, verbs for tenses). */
   words: string[];
 }
@@ -124,18 +156,15 @@ const DRILL_VERBS = [
 ];
 
 const DRILL_TYPES: DrillType[] = [
-  { task: 'Множественное число', hint: 'кыз → кыздар', make: plural, words: DRILL_NOUNS },
-  { task: 'Где? (жатыш)', hint: 'үй → үйдө', make: locative, words: DRILL_NOUNS },
-  { task: 'Куда? (барыш)', hint: 'үй → үйгө', make: dative, words: DRILL_NOUNS },
-  { task: 'Откуда? (чыгыш)', hint: 'үй → үйдөн', make: ablative, words: DRILL_NOUNS },
-  { task: 'Настоящее (-ып жатат)', hint: 'бар → барып жатат', make: presentCont, words: DRILL_VERBS },
-  { task: 'Прошедшее (-ды)', hint: 'кел → келди', make: pastTense, words: DRILL_VERBS },
-  { task: 'Будущее (-ат)', hint: 'бар → барат', make: futureAorist, words: DRILL_VERBS },
-  { task: 'Отрицание (-байт)', hint: 'кел → келбейт', make: negAorist, words: DRILL_VERBS },
+  { task: 'Множественное число', hint: 'кыз → кыздар', suffix: PLURAL, words: DRILL_NOUNS },
+  { task: 'Где? (жатыш)', hint: 'үй → үйдө', suffix: LOCATIVE, words: DRILL_NOUNS },
+  { task: 'Куда? (барыш)', hint: 'үй → үйгө', suffix: DATIVE, words: DRILL_NOUNS },
+  { task: 'Откуда? (чыгыш)', hint: 'үй → үйдөн', suffix: ABLATIVE, words: DRILL_NOUNS },
+  { task: 'Настоящее (-ып жатат)', hint: 'бар → барып жатат', suffix: PRESENT_CONT, words: DRILL_VERBS },
+  { task: 'Прошедшее (-ды)', hint: 'кел → келди', suffix: PAST, words: DRILL_VERBS },
+  { task: 'Будущее (-ат)', hint: 'бар → барат', suffix: AORIST, words: DRILL_VERBS },
+  { task: 'Отрицание (-байт)', hint: 'кел → келбейт', suffix: NEG_AORIST, words: DRILL_VERBS },
 ];
-
-/** Task names accepted by the `tasks` filter of buildDrills. */
-const DRILL_TASKS = DRILL_TYPES.map((t) => t.task);
 
 /**
  * Deterministic pseudo-random drill set for a given seed (e.g. day number).
@@ -154,7 +183,30 @@ export function buildDrills(count: number, seed: number, tasks?: string[]): Dril
     const key = `${word}|${type.task}`;
     if (used.has(key)) continue;
     used.add(key);
-    drills.push({ task: type.task, word, answer: type.make(word), hint: type.hint });
+    drills.push({ task: type.task, word, answer: inflect(type.suffix, word), hint: type.hint });
   }
   return drills;
+}
+
+/**
+ * Четыре варианта ответа для дрилла: верный плюс три неверных.
+ *
+ * Дистракторы берутся с обеих осей ошибки — сперва по одному нарушению ассимиляции (там, где у
+ * суффикса есть вторая согласная), затем нарушения гармонии, — чтобы упражнение проверяло оба
+ * правила, а не то из них, которое случайно оказалось первым в переборе. У суффиксов без
+ * согласной (`-ат`, `-ып жатат`) ось ассимиляции пуста, и все три дистрактора гармонические:
+ * там больше и нечего нарушать. Порядок детерминирован сидом, чтобы кнопки не переставлялись
+ * при каждом пересборе сессии.
+ */
+export function drillOptions(drill: Drill, seed: number): string[] {
+  const type = DRILL_TYPES.find((t) => t.task === drill.task);
+  if (!type) return [drill.answer];
+  const { harmony, assimilation } = wrongForms(type.suffix, drill.word);
+  const wrong: string[] = [];
+  for (const form of [...assimilation.slice(0, 1), ...harmony, ...assimilation.slice(1)]) {
+    if (wrong.length === 3) break;
+    if (!wrong.includes(form) && form !== drill.answer) wrong.push(form);
+  }
+  const next = rng(seed);
+  return shuffle([drill.answer, ...wrong], (n) => next() % n);
 }

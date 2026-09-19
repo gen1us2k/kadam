@@ -1,4 +1,5 @@
-// Состояние Telegram-бота: подписчики, offset getUpdates и день последней рассылки.
+// Состояние Telegram-бота: карта чатов (у каждого — день последней отправки и курсор сессии)
+// и offset getUpdates.
 // Запись атомарна (уникальный временный файл + rename) и сериализована очередью: poll() и
 // broadcast() чередуются на await, поэтому общий временный файл был бы гонкой, а не удобством.
 // Чтение прощает ровно два случая — файла ещё нет или в нём невалидный JSON (пустое состояние);
@@ -6,20 +7,81 @@
 
 import { readFile, writeFile, rename, mkdir, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
-// The day string must be byte-identical to the site's, so the format has exactly one definition.
-import { todayStr } from '../src/lib/daily.ts';
+
+export interface Session {
+  /** Какому дню принадлежит сессия; смена суток её отбрасывает. */
+  day: string;
+  /** Номер текущего упражнения, 0..15. */
+  i: number;
+  /** Сколько из отвеченных было верно. */
+  correct: number;
+  /** Подписи упражнений, которые не получились — для итогового разбора. */
+  missed: string[];
+  /** Сообщение на экране, которое редактируется. */
+  msgId: number;
+  /** Для сборки предложения: id слов, нажатых по порядку. */
+  picked: number[];
+}
+
+export interface ChatState {
+  /** День последней отправки этому чату, null — ещё не слали. */
+  sentDay: string | null;
+  session: Session | null;
+}
 
 export interface BotState {
-  /** Subscribed chat ids. */
-  chats: number[];
+  /** Ключ — chat id строкой: JSON не умеет числовые ключи объектов. */
+  chats: Record<string, ChatState>;
   /** getUpdates offset — last seen update_id + 1. */
   offset: number;
-  /** Local date "YYYY-MM-DD" of the last daily broadcast, null before the first one. */
-  lastSentDay: string | null;
 }
 
 export function emptyState(): BotState {
-  return { chats: [], offset: 0, lastSentDay: null };
+  return { chats: {}, offset: 0 };
+}
+
+/** Одна запись чата с безопасными значениями по умолчанию. */
+function chatFrom(raw: unknown): ChatState {
+  const r = (raw ?? {}) as Partial<ChatState>;
+  const s = r.session as Partial<Session> | null | undefined;
+  const session: Session | null =
+    s && typeof s.day === 'string' && Number.isFinite(s.i)
+      ? {
+          day: s.day,
+          i: Number(s.i),
+          correct: Number.isFinite(s.correct) ? Number(s.correct) : 0,
+          missed: Array.isArray(s.missed) ? s.missed.filter((m) => typeof m === 'string') : [],
+          msgId: Number.isFinite(s.msgId) ? Number(s.msgId) : 0,
+          picked: Array.isArray(s.picked) ? s.picked.filter((x) => Number.isFinite(x)) : [],
+        }
+      : null;
+  return { sentDay: typeof r.sentDay === 'string' ? r.sentDay : null, session };
+}
+
+/**
+ * Разбор поля chats, включая старый формат `number[]`. Прошлая версия хранила подписчиков
+ * массивом и один `lastSentDay` на всех; миграция раздаёт этот день каждому чату, иначе в день
+ * обновления все получили бы задание повторно.
+ *
+ * ОТСТУПЛЕНИЕ ОТ СПЕКИ (AC-3): спека говорит «превращается в карту без sentDay». Раздача старого
+ * дня выбрана сознательно: подписчик в этот день уже получил задание в старом, спойлерном виде,
+ * и второе сообщение было бы ошибкой. Цена — интерактивная сессия начинается со следующего дня.
+ */
+function chatsFrom(parsed: { chats?: unknown; lastSentDay?: unknown }): Record<string, ChatState> {
+  const out: Record<string, ChatState> = {};
+  if (Array.isArray(parsed.chats)) {
+    const sentDay = typeof parsed.lastSentDay === 'string' ? parsed.lastSentDay : null;
+    for (const id of parsed.chats) {
+      if (Number.isFinite(id)) out[String(id)] = { sentDay, session: null };
+    }
+    return out;
+  }
+  if (parsed.chats && typeof parsed.chats === 'object') {
+    for (const [id, raw] of Object.entries(parsed.chats as Record<string, unknown>)) {
+      if (Number.isFinite(Number(id))) out[id] = chatFrom(raw);
+    }
+  }
+  return out;
 }
 
 /**
@@ -37,18 +99,17 @@ export async function loadState(path: string): Promise<BotState> {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return emptyState();
     throw e;
   }
-  let parsed: Partial<BotState>;
+  let parsed: Partial<BotState> & { lastSentDay?: unknown };
   try {
     // `?? {}`: a literal `null` is valid JSON but has no fields to read.
-    parsed = (JSON.parse(raw) ?? {}) as Partial<BotState>;
+    parsed = (JSON.parse(raw) ?? {}) as Partial<BotState> & { lastSentDay?: unknown };
   } catch {
     console.error(`[bot] state file ${path} is not valid JSON — starting with an empty state`);
     return emptyState();
   }
   return {
-    chats: Array.isArray(parsed.chats) ? parsed.chats.filter((c) => Number.isFinite(c)) : [],
+    chats: chatsFrom(parsed),
     offset: Number.isFinite(parsed.offset) ? Number(parsed.offset) : 0,
-    lastSentDay: typeof parsed.lastSentDay === 'string' ? parsed.lastSentDay : null,
   };
 }
 
@@ -86,25 +147,32 @@ export function saveState(path: string, state: BotState): Promise<void> {
 
 /** Subscribe a chat. Returns true when the chat was not already subscribed. */
 export function addChat(state: BotState, chatId: number): boolean {
-  if (state.chats.includes(chatId)) return false;
-  state.chats.push(chatId);
+  const key = String(chatId);
+  if (state.chats[key]) return false;
+  state.chats[key] = { sentDay: null, session: null };
   return true;
 }
 
 /** Unsubscribe a chat. Returns true when the chat was actually subscribed. */
 export function removeChat(state: BotState, chatId: number): boolean {
-  const i = state.chats.indexOf(chatId);
-  if (i === -1) return false;
-  state.chats.splice(i, 1);
+  const key = String(chatId);
+  if (!state.chats[key]) return false;
+  delete state.chats[key];
   return true;
 }
 
+/** Чаты, которым сегодня ещё не слали. Порядок — тот, что даёт Object.entries; неважен. */
+export function chatsDue(state: BotState, day: string): number[] {
+  return Object.entries(state.chats)
+    .filter(([, c]) => c.sentDay !== day)
+    .map(([id]) => Number(id));
+}
+
 /**
- * Should the daily broadcast run now? True once per local day, at or after `sendAt` ("HH:MM").
- * Persisting lastSentDay is what makes a restart safe: the same day never fires twice.
+ * Пора ли рассылать: время суток наступило. Кому именно слать, решает chatsDue — день теперь
+ * отмечается по каждому чату отдельно, поэтому глобального «уже слали сегодня» больше нет.
  */
-export function shouldSend(state: BotState, sendAt: string, now = new Date()): boolean {
-  if (state.lastSentDay === todayStr(now)) return false;
+export function isSendTime(sendAt: string, now = new Date()): boolean {
   const hhmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   return hhmm >= sendAt;
 }
