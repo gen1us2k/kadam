@@ -88,6 +88,13 @@ function chatsFrom(parsed: { chats?: unknown; lastSentDay?: unknown }): Record<s
     for (const [id, raw] of Object.entries(parsed.chats as Record<string, unknown>)) {
       if (Number.isFinite(Number(id))) out[id] = chatFrom(raw);
     }
+    return out;
+  }
+  // Файл разобрался, но подписчиков в нём нет в узнаваемом виде. Свежий файл (`{}`) сюда тоже
+  // попадает, и для него это норма; а вот у файла с другими полями это значит, что следующая
+  // запись сотрёт список — молчать об этом нельзя, как и о невалидном JSON.
+  if (parsed.chats !== undefined || Object.keys(parsed).length > 0) {
+    console.error('[bot] state file has no recognisable "chats" — starting with no subscribers');
   }
   return out;
 }

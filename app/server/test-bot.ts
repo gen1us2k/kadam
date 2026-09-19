@@ -261,6 +261,19 @@ check('migrated chats start without a session', migrated.chats['111'].session ==
 const badSession = join(dir, 'bad-session.json');
 await writeFile(badSession, JSON.stringify({ chats: { '5': { sentDay: null, session: { nonsense: true } } }, offset: 0 }), 'utf8');
 check('an ill-shaped session becomes null', (await loadState(badSession)).chats['5'].session === null);
+// Файл разобрался, но подписчиков в нём не узнать: молча стартовать пустым нельзя — следующая
+// запись стёрла бы список. Пустой `{}` (свежий файл) при этом не шумит.
+const noChats = join(dir, 'no-chats.json');
+await writeFile(noChats, JSON.stringify({ offset: 5 }), 'utf8');
+const warned: unknown[] = [];
+console.error = (...args: unknown[]) => void warned.push(args);
+const orphan = await loadState(noChats).finally(() => { console.error = realError; });
+check('a state file without chats is reported', warned.length === 1 && orphan.offset === 5, warned);
+await writeFile(noChats, '{}', 'utf8');
+const quiet: unknown[] = [];
+console.error = (...args: unknown[]) => void quiet.push(args);
+await loadState(noChats).finally(() => { console.error = realError; });
+check('an empty fresh file stays quiet', quiet.length === 0, quiet);
 
 // --- morphology: декларативные формы не изменили ни одного ответа ---
 const FORMS: [string, string, string][] = [
@@ -371,6 +384,10 @@ check('garbage rejected', parseTap('nonsense') === null);
 check('bad day rejected', parseTap('a:yesterday:0:0') === null);
 check('negative index rejected', parseTap('a:2026-09-20:-1:0') === null);
 check('non-numeric arg rejected', parseTap('a:2026-09-20:0:abc') === null);
+// Number('') === 0: пустое поле не должно разбираться как индекс 0.
+check('empty index rejected', parseTap('a:2026-09-20::5') === null);
+check('empty arg rejected', parseTap('a:2026-09-20:3:') === null);
+check('empty reset index rejected', parseTap('reset:2026-09-20:') === null);
 
 // --- машина сессии ---
 const s0: Session = { day: '2026-09-20', i: 1, missed: [], msgId: 10, picked: [] };
@@ -424,6 +441,11 @@ const fin = summary(done16, exercises.length);
 // Счёт выводится как «отвечено минус промахи»: 16 − 2.
 check('summary derives the score from the misses', fin.text.includes('14 из 16'), fin.text);
 check('render past the last exercise is the summary', render(done16, exercises).text === fin.text);
+// Последний ответ тоже получает подтверждение — иначе шестнадцатое упражнение осталось бы без ✅/❌.
+const last: Session = { day: '2026-09-20', i: 15, missed: [], msgId: 1, picked: [] };
+const lastEx = exercises[15] as ChoiceExercise;
+const lastView = applyTap(last, exercises, { op: 'answer', day: last.day, i: 15, arg: lastEx.options.indexOf(lastEx.answer) });
+check('the last answer is confirmed on the summary screen', lastView.view !== null && lastView.view.text.includes('✅') && lastView.view.text.includes('16 из 16'), lastView.view?.text);
 check('summary lists the misses', fin.text.includes('көл: озеро'));
 check('summary has no buttons', fin.keyboard.length === 0);
 

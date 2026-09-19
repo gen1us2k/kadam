@@ -18,11 +18,13 @@ export type Tap =
  */
 export function parseTap(data: string): Tap | null {
   const [op, day, rawI, rawArg] = data.split(':');
+  // Только цифры: Number('') === 0, и пустое поле иначе разобралось бы как индекс 0.
+  const digits = /^\d+$/;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day ?? '') || !digits.test(rawI ?? '')) return null;
   const i = Number(rawI);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day ?? '') || !Number.isInteger(i) || i < 0) return null;
   if (op === 'reset') return { op: 'reset', day, i };
+  if (!digits.test(rawArg ?? '')) return null;
   const arg = Number(rawArg);
-  if (!Number.isInteger(arg) || arg < 0) return null;
   if (op === 'a') return { op: 'answer', day, i, arg };
   if (op === 'w') return { op: 'word', day, i, arg };
   return null;
@@ -52,7 +54,7 @@ function header(session: Session, total: number, feedback?: string): string {
 /** Экран текущего упражнения. */
 export function render(session: Session, exercises: Exercise[], feedback?: string): View {
   const ex = exercises[session.i];
-  if (!ex) return summary(session, exercises.length);
+  if (!ex) return summary(session, exercises.length, feedback);
   const e = escapeHtml;
   const head = header(session, exercises.length, feedback);
 
@@ -82,9 +84,11 @@ export function render(session: Session, exercises: Exercise[], feedback?: strin
 }
 
 /** Итоговый экран: счёт и разбор того, что не получилось. */
-export function summary(session: Session, total: number): View {
+export function summary(session: Session, total: number, feedback?: string): View {
   const lines = [
     `🇰🇬 <b>Задание на ${escapeHtml(session.day)}</b> — готово`,
+    // Отклик на последний ответ: без него шестнадцатое упражнение осталось бы без ✅/❌.
+    ...(feedback ? [feedback] : []),
     // Верных — всё отвеченное минус промахи; отдельного счётчика нет намеренно (см. Session).
     `<b>${session.i - session.missed.length} из ${total}</b>`,
   ];

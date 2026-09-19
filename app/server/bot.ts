@@ -149,6 +149,8 @@ async function handleTap(
   if (edited.kind === 'drop') {
     removeChat(state, chatId);
   } else if (edited.kind === 'transient') {
+    // ОТСТУПЛЕНИЕ ОТ СПЕКИ (DC-1 / AC-17): спека говорит «если правка вернула ошибку, бот шлёт
+    // новое сообщение» — на любую ошибку. Здесь это сужено до «сообщения больше нет».
     // Сообщение недоступно — удалено или старше 48 часов: продолжаем в новом. Сетевой сбой
     // трогать НЕЛЬЗЯ, иначе каждый обрыв плодил бы дубль сессии и уводил msgId с живого
     // сообщения. Цена: экран замирает на предыдущем вопросе, а курсор уже сдвинулся, поэтому
@@ -268,14 +270,22 @@ while (!stopping) {
   if (result.updates.length === 0) continue;
   for (const u of result.updates) {
     state.offset = Math.max(state.offset, u.update_id + 1);
-    const chatId = u.message?.chat?.id;
-    const text = u.message?.text;
-    if (chatId !== undefined && text) await handleCommand(chatId, text);
-    const cb = u.callback_query;
-    if (cb?.data && cb.message) await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
-    // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом
-    // пути» должно держаться буквально: иначе у клиента остался бы крутящийся спиннер.
-    else if (cb) await answerCallback(token, cb.id, STALE);
+    // Граница ошибок на одно обновление: сбой в обработке одного сообщения не должен ронять
+    // процесс и терять offset всего пакета — Telegram переиграл бы его, и /start поздоровался бы
+    // дважды. Рассылка защищена так же через .catch у тика. Запись состояния ниже НЕ обёрнута
+    // намеренно: если диск не пишет, честнее упасть с кодом 1 и дать systemd перезапустить.
+    try {
+      const chatId = u.message?.chat?.id;
+      const text = u.message?.text;
+      if (chatId !== undefined && text) await handleCommand(chatId, text);
+      const cb = u.callback_query;
+      if (cb?.data && cb.message) await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
+      // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом
+      // пути» должно держаться буквально: иначе у клиента остался бы крутящийся спиннер.
+      else if (cb) await answerCallback(token, cb.id, STALE);
+    } catch (e) {
+      console.error(`[bot] update ${u.update_id} failed: ${e instanceof Error ? e.message : e}`);
+    }
   }
   await saveState(STATE_FILE, state);
 }
