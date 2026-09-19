@@ -29,14 +29,13 @@ export interface Chip {
 
 /** Shuffle the words into a bank; avoid handing back the already-correct order. */
 export function makeBank(words: string[], seed: number): Chip[] {
-  const chips = words.map((w, id) => ({ w, id }));
+  let chips = words.map((w, id) => ({ w, id }));
   if (chips.length < 2) return chips;
   const next = rng(seed);
   for (let attempt = 0; attempt < 6; attempt++) {
-    for (let i = chips.length - 1; i > 0; i--) {
-      const j = next() % (i + 1);
-      [chips[i], chips[j]] = [chips[j], chips[i]];
-    }
+    // Each attempt reshuffles the PREVIOUS attempt's order with the same generator — that is
+    // what the component did before this moved here, and the bank must not shift for anyone.
+    chips = shuffle(chips, (n) => next() % n);
     if (chips.some((c, i) => c.id !== i)) break; // not the original order
   }
   return chips;

@@ -15,8 +15,8 @@ export interface ChoiceExercise {
   /** Текст вопроса без разметки — экранируется при рендере. */
   prompt: string;
   options: string[];
-  /** Индекс верного варианта в `options`. */
-  answer: number;
+  /** Верный вариант — текстом, как и у сборки: так у обоих видов упражнения одно поле ответа. */
+  answer: string;
   /** Короткая подпись для итогового разбора. */
   label: string;
 }
@@ -67,23 +67,22 @@ export function buildExercises(task: DailyTask, deck: VocabRow[]): Exercise[] {
   });
 
   for (const drill of task.drills) {
-    const options = drillOptions(drill, exerciseSeed(task.seed, out.length));
+    const prompt = `${drill.word} → ${drill.task}`;
     out.push({
       kind: 'drill',
-      prompt: `${drill.word} → ${drill.task}`,
-      options,
-      answer: options.indexOf(drill.answer),
-      label: `${drill.word} → ${drill.task}`,
+      prompt,
+      options: drillOptions(drill, exerciseSeed(task.seed, out.length)),
+      answer: drill.answer,
+      label: prompt,
     });
   }
 
   for (const row of task.words) {
-    const options = wordOptions(deck, row, exerciseSeed(task.seed, out.length));
     out.push({
       kind: 'word',
       prompt: `Что значит «${row.kg}»?`,
-      options,
-      answer: options.indexOf(row.ru),
+      options: wordOptions(deck, row, exerciseSeed(task.seed, out.length)),
+      answer: row.ru,
       label: row.kg,
     });
   }
@@ -94,9 +93,4 @@ export function buildExercises(task: DailyTask, deck: VocabRow[]): Exercise[] {
 /** Верна ли сборка предложения. Сравнение по тексту, поэтому повтор слова не даёт ложной ошибки. */
 export function checkAssembled(ex: AssembleExercise, picked: number[]): boolean {
   return picked.map((id) => ex.bank.find((c) => c.id === id)?.w ?? '').join(' ') === ex.answer;
-}
-
-/** Верный ответ упражнения в человекочитаемом виде — для разбора ошибок. */
-export function correctAnswerOf(ex: Exercise): string {
-  return ex.kind === 'sentence' ? ex.answer : ex.options[ex.answer];
 }

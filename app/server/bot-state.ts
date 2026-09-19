@@ -9,13 +9,19 @@ import { readFile, writeFile, rename, mkdir, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 export interface Session {
-  /** Какому дню принадлежит сессия; смена суток её отбрасывает. */
+  /**
+   * Какому дню принадлежит сессия; смена суток её отбрасывает. Упражнения пересобираются из сида
+   * дня И колоды, а ключ здесь — только день: допущение в том, что колода заморожена на релиз.
+   * Деплой, меняющий anki/*.csv посреди дня, сдвинет слова под живым курсором (принятый риск).
+   */
   day: string;
-  /** Номер текущего упражнения, 0..15. */
+  /** Номер текущего упражнения; он же — число уже отвеченных. */
   i: number;
-  /** Сколько из отвеченных было верно. */
-  correct: number;
-  /** Подписи упражнений, которые не получились — для итогового разбора. */
+  /**
+   * Подписи упражнений, которые не получились. Счёт отдельно не хранится: каждый ответ либо
+   * попадает сюда, либо верен, поэтому верных всегда `i - missed.length` — и второго источника
+   * правды, способного разойтись с первым, нет.
+   */
   missed: string[];
   /** Сообщение на экране, которое редактируется. */
   msgId: number;
@@ -40,6 +46,9 @@ export function emptyState(): BotState {
   return { chats: {}, offset: 0 };
 }
 
+/** Конечное число или 0. `Number()` нужен лишь потому, что `Number.isFinite` не сужает тип. */
+const num = (v: unknown): number => (Number.isFinite(v) ? Number(v) : 0);
+
 /** Одна запись чата с безопасными значениями по умолчанию. */
 function chatFrom(raw: unknown): ChatState {
   const r = (raw ?? {}) as Partial<ChatState>;
@@ -48,10 +57,9 @@ function chatFrom(raw: unknown): ChatState {
     s && typeof s.day === 'string' && Number.isFinite(s.i)
       ? {
           day: s.day,
-          i: Number(s.i),
-          correct: Number.isFinite(s.correct) ? Number(s.correct) : 0,
+          i: num(s.i),
           missed: Array.isArray(s.missed) ? s.missed.filter((m) => typeof m === 'string') : [],
-          msgId: Number.isFinite(s.msgId) ? Number(s.msgId) : 0,
+          msgId: num(s.msgId),
           picked: Array.isArray(s.picked) ? s.picked.filter((x) => Number.isFinite(x)) : [],
         }
       : null;
@@ -109,7 +117,7 @@ export async function loadState(path: string): Promise<BotState> {
   }
   return {
     chats: chatsFrom(parsed),
-    offset: Number.isFinite(parsed.offset) ? Number(parsed.offset) : 0,
+    offset: num(parsed.offset),
   };
 }
 

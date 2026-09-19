@@ -46,8 +46,11 @@ function highVowel(word: string): 'ы' | 'и' | 'у' | 'ү' {
 const endsVoiceless = (word: string) => VOICELESS.includes(word[word.length - 1]?.toLowerCase() ?? '');
 const endsVowel = (word: string) => VOWELS.includes(word[word.length - 1]?.toLowerCase() ?? '');
 
-const LOW_VOWELS = ['а', 'е', 'о', 'ө'] as const;
-const HIGH_VOWELS = ['ы', 'и', 'у', 'ү'] as const;
+/** Два ряда гармонии: функция выбора гласной и все гласные ряда — всегда парой, не порознь. */
+const HARMONY = {
+  low: { pick: lowVowel, variants: ['а', 'е', 'о', 'ө'] },
+  high: { pick: highVowel, variants: ['ы', 'и', 'у', 'ү'] },
+} as const;
 
 /**
  * Форма суффикса как данные: слово + согласная + гласная + хвост. Держать её таблицей, а не
@@ -57,10 +60,10 @@ const HIGH_VOWELS = ['ы', 'и', 'у', 'ү'] as const;
 interface Suffix {
   /** Согласная по ассимиляции. Пустая строка — у суффиксов, которые начинаются с гласной. */
   cons: (word: string) => string;
-  /** Все согласные этого суффикса: первая — для верной формы, остальные дают дистракторы. */
+  /** Все согласные, которые может дать `cons`; те, что не подошли слову, дают дистракторы. */
   consVariants: readonly string[];
-  vowel: (word: string) => string;
-  vowelVariants: readonly string[];
+  /** Ряд гармонии гласной суффикса. */
+  harmony: keyof typeof HARMONY;
   tail: string;
 }
 
@@ -72,36 +75,36 @@ const PLURAL: Suffix = {
     return endsVoiceless(w) ? 'т' : 'д';
   },
   consVariants: ['л', 'т', 'д'],
-  vowel: lowVowel,
-  vowelVariants: LOW_VOWELS,
+  harmony: 'low',
   tail: 'р',
 };
 const voicedPair = (voiced: string, voiceless: string) => ({
   cons: (w: string) => (endsVoiceless(w) ? voiceless : voiced),
   consVariants: [voiced, voiceless] as const,
 });
-const NO_CONS = { cons: () => '', consVariants: [''] as const };
+const NO_CONS = { cons: () => '', consVariants: [] as const };
 
 /** Жатыш (где): -да/-та × 4 гласных. */
-const LOCATIVE: Suffix = { ...voicedPair('д', 'т'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: '' };
+const LOCATIVE: Suffix = { ...voicedPair('д', 'т'), harmony: 'low', tail: '' };
 /** Барыш (куда): -га/-ка × 4 гласных. */
-const DATIVE: Suffix = { ...voicedPair('г', 'к'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: '' };
+const DATIVE: Suffix = { ...voicedPair('г', 'к'), harmony: 'low', tail: '' };
 /** Чыгыш (откуда): -дан/-тан × 4 гласных. */
-const ABLATIVE: Suffix = { ...voicedPair('д', 'т'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: 'н' };
+const ABLATIVE: Suffix = { ...voicedPair('д', 'т'), harmony: 'low', tail: 'н' };
 
 // --- Глагол, 3-е лицо ед. числа (регулярные основы на согласную). ---
 
 /** Настоящее время (сейчас): деепричастие -ып + жатат. бар → барып жатат. */
-const PRESENT_CONT: Suffix = { ...NO_CONS, vowel: highVowel, vowelVariants: HIGH_VOWELS, tail: 'п жатат' };
+const PRESENT_CONT: Suffix = { ...NO_CONS, harmony: 'high', tail: 'п жатат' };
 /** Прошедшее определённое: -ды/-ти. бар → барды, кет → кетти. */
-const PAST: Suffix = { ...voicedPair('д', 'т'), vowel: highVowel, vowelVariants: HIGH_VOWELS, tail: '' };
+const PAST: Suffix = { ...voicedPair('д', 'т'), harmony: 'high', tail: '' };
 /** Настоящее-будущее (аорист): -ат. бар → барат, кел → келет. */
-const AORIST: Suffix = { ...NO_CONS, vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: 'т' };
+const AORIST: Suffix = { ...NO_CONS, harmony: 'low', tail: 'т' };
 /** Отрицание аориста: -байт/-пайт. бар → барбайт, кет → кетпейт. */
-const NEG_AORIST: Suffix = { ...voicedPair('б', 'п'), vowel: lowVowel, vowelVariants: LOW_VOWELS, tail: 'йт' };
+const NEG_AORIST: Suffix = { ...voicedPair('б', 'п'), harmony: 'low', tail: 'йт' };
 
 /** Верная форма: согласная и гласная выбраны по гармонии и ассимиляции. */
-const inflect = (s: Suffix, word: string): string => `${word}${s.cons(word)}${s.vowel(word)}${s.tail}`;
+const inflect = (s: Suffix, word: string): string =>
+  `${word}${s.cons(word)}${HARMONY[s.harmony].pick(word)}${s.tail}`;
 
 /**
  * Неверные формы этого суффикса, разложенные по двум осям ошибки.
@@ -112,17 +115,12 @@ const inflect = (s: Suffix, word: string): string => `${word}${s.cons(word)}${s.
  * разделены, а выбор из них делает вызывающий код.
  */
 function wrongForms(s: Suffix, word: string): { harmony: string[]; assimilation: string[] } {
-  const correct = inflect(s, word);
   const c = s.cons(word);
-  const v = s.vowel(word);
-  const harmony = s.vowelVariants
-    .filter((x) => x !== v)
-    .map((x) => `${word}${c}${x}${s.tail}`)
-    .filter((f) => f !== correct);
-  const assimilation = s.consVariants
-    .filter((x) => x !== c)
-    .map((x) => `${word}${x}${v}${s.tail}`)
-    .filter((f) => f !== correct);
+  const v = HARMONY[s.harmony].pick(word);
+  // Формы отличаются от верной ровно одним символом в одной позиции, поэтому совпасть с ней
+  // или друг с другом не могут — дополнительная дедупликация не нужна.
+  const harmony = HARMONY[s.harmony].variants.filter((x) => x !== v).map((x) => `${word}${c}${x}${s.tail}`);
+  const assimilation = s.consVariants.filter((x) => x !== c).map((x) => `${word}${x}${v}${s.tail}`);
   return { harmony, assimilation };
 }
 
@@ -202,11 +200,8 @@ export function drillOptions(drill: Drill, seed: number): string[] {
   const type = DRILL_TYPES.find((t) => t.task === drill.task);
   if (!type) return [drill.answer];
   const { harmony, assimilation } = wrongForms(type.suffix, drill.word);
-  const wrong: string[] = [];
-  for (const form of [...assimilation.slice(0, 1), ...harmony, ...assimilation.slice(1)]) {
-    if (wrong.length === 3) break;
-    if (!wrong.includes(form) && form !== drill.answer) wrong.push(form);
-  }
+  // Одна ошибка ассимиляции (если у суффикса есть вторая согласная) и гармонические до трёх.
+  const wrong = [...assimilation.slice(0, 1), ...harmony].slice(0, 3);
   const next = rng(seed);
   return shuffle([drill.answer, ...wrong], (n) => next() % n);
 }

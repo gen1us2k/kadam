@@ -1,10 +1,9 @@
 // Машина сессии: что показать на текущем шаге и что делать с нажатием. Чистая — ни сети, ни
 // диска, поэтому порядок шагов, подсчёт и обработка устаревших нажатий проверяются тестом.
 
-import { escapeHtml } from './daily-task.ts';
-import { checkAssembled, correctAnswerOf, type Exercise } from './exercise.ts';
+import { checkAssembled, type Exercise } from './exercise.ts';
 import type { Session } from './bot-state.ts';
-import type { Keyboard } from './telegram.ts';
+import { escapeHtml, type Keyboard } from './telegram.ts';
 
 /** Действия, которые может прислать кнопка. */
 export type Tap =
@@ -37,33 +36,35 @@ export interface View {
   keyboard: Keyboard;
 }
 
-const TOTAL = 16;
+/** Разложить кнопки по рядам заданной ширины. */
+function rows<T>(items: T[], width: number): T[][] {
+  const out: T[][] = [];
+  for (let n = 0; n < items.length; n += width) out.push(items.slice(n, n + width));
+  return out;
+}
 
 /** Заголовок с прогрессом плюс необязательная строка отклика на прошлый ответ. */
-function header(session: Session, feedback?: string): string {
-  const progress = `🇰🇬 <b>Задание на ${escapeHtml(session.day)}</b> · ${session.i + 1}/${TOTAL}`;
+function header(session: Session, total: number, feedback?: string): string {
+  const progress = `🇰🇬 <b>Задание на ${escapeHtml(session.day)}</b> · ${session.i + 1}/${total}`;
   return feedback ? `${progress}\n${feedback}\n` : `${progress}\n`;
 }
 
 /** Экран текущего упражнения. */
 export function render(session: Session, exercises: Exercise[], feedback?: string): View {
   const ex = exercises[session.i];
-  if (!ex) return summary(session);
+  if (!ex) return summary(session, exercises.length);
   const e = escapeHtml;
+  const head = header(session, exercises.length, feedback);
 
   if (ex.kind === 'sentence') {
     const byId = (id: number) => ex.bank.find((c) => c.id === id)?.w ?? '';
-    const built = session.picked.map(byId).join(' ');
     const left = ex.bank.filter((c) => !session.picked.includes(c.id));
-    const text =
-      `${header(session, feedback)}\n📝 ${e(ex.prompt)}\n\n` +
-      `<b>${e(built) || '…'}</b>${'  _'.repeat(left.length)}`;
-    const keyboard: Keyboard = [];
-    for (let n = 0; n < left.length; n += 3) {
-      keyboard.push(
-        left.slice(n, n + 3).map((c) => ({ text: c.w, callback_data: encode('w', session.day, session.i, c.id) })),
-      );
-    }
+    const built = session.picked.map(byId).join(' ');
+    const text = `${head}\n📝 ${e(ex.prompt)}\n\n<b>${e(built) || '…'}</b>${'  _'.repeat(left.length)}`;
+    const keyboard = rows(
+      left.map((c) => ({ text: c.w, callback_data: encode('w', session.day, session.i, c.id) })),
+      3,
+    );
     if (session.picked.length > 0) {
       keyboard.push([{ text: '↺ сброс', callback_data: encode('reset', session.day, session.i) }]);
     }
@@ -71,23 +72,21 @@ export function render(session: Session, exercises: Exercise[], feedback?: strin
   }
 
   const icon = ex.kind === 'drill' ? '⚙️' : '📖';
-  const text = `${header(session, feedback)}\n${icon} ${e(ex.prompt)}`;
-  const keyboard: Keyboard = [];
-  for (let n = 0; n < ex.options.length; n += 2) {
-    keyboard.push(
-      ex.options
-        .slice(n, n + 2)
-        .map((opt, k) => ({ text: opt, callback_data: encode('a', session.day, session.i, n + k) })),
-    );
-  }
-  return { text, keyboard };
+  return {
+    text: `${head}\n${icon} ${e(ex.prompt)}`,
+    keyboard: rows(
+      ex.options.map((opt, k) => ({ text: opt, callback_data: encode('a', session.day, session.i, k) })),
+      2,
+    ),
+  };
 }
 
 /** Итоговый экран: счёт и разбор того, что не получилось. */
-export function summary(session: Session): View {
+export function summary(session: Session, total: number): View {
   const lines = [
     `🇰🇬 <b>Задание на ${escapeHtml(session.day)}</b> — готово`,
-    `<b>${session.correct} из ${TOTAL}</b>`,
+    // Верных — всё отвеченное минус промахи; отдельного счётчика нет намеренно (см. Session).
+    `<b>${session.i - session.missed.length} из ${total}</b>`,
   ];
   if (session.missed.length > 0) {
     lines.push('', 'Не получилось:', ...session.missed.map((m) => `• ${escapeHtml(m)}`));
@@ -96,7 +95,12 @@ export function summary(session: Session): View {
   return { text: lines.join('\n'), keyboard: [] };
 }
 
-export const isFinished = (session: Session): boolean => session.i >= TOTAL;
+/**
+ * Сессия доиграна, когда курсор вышел за упражнения. Число упражнений берётся из самого списка,
+ * а не из константы: оно складывается в другом месте (предложение + дриллы + WORD_COUNT), и
+ * вторая запись того же числа здесь разошлась бы с первой при любой правке состава.
+ */
+export const isFinished = (session: Session, total: number): boolean => session.i >= total;
 
 /**
  * Относится ли нажатие к живой сессии: то самое сообщение и тот самый день.
@@ -116,7 +120,8 @@ export interface TapResult {
   toast?: string;
 }
 
-const STALE = 'Это уже неактуально — откройте /task';
+/** Текст для тоста, когда нажатие относится к тому, чего уже нет. */
+export const STALE = 'Это уже неактуально — откройте /task';
 
 /**
  * Применить нажатие к сессии. Нажатие принимается, только если день и номер упражнения совпадают
@@ -124,17 +129,14 @@ const STALE = 'Это уже неактуально — откройте /task';
  * упражнению и подделанные клиентом строки.
  */
 export function applyTap(session: Session, exercises: Exercise[], tap: Tap): TapResult {
-  if (tap.day !== session.day || tap.i !== session.i || isFinished(session)) {
-    return { view: null, toast: STALE };
-  }
   const ex = exercises[session.i];
-  if (!ex) return { view: null, toast: STALE };
+  // `!ex` покрывает и доигранную сессию: за последним упражнением элемента нет.
+  if (tap.day !== session.day || tap.i !== session.i || !ex) return { view: null, toast: STALE };
 
   if (tap.op === 'reset') {
     if (ex.kind !== 'sentence') return { view: null, toast: 'Здесь нечего сбрасывать' };
     // Без этой проверки повторный тап по «сброс» дал бы побайтово тот же экран, Telegram ответил
-    // бы 400 «message is not modified», а вызывающий код принял бы это за недоступное сообщение
-    // и продублировал сессию новым сообщением.
+    // бы 400 «message is not modified», а вызывающий код не смог бы отличить это от сбоя.
     if (session.picked.length === 0) return { view: null, toast: 'Уже пусто' };
     session.picked = [];
     return { view: render(session, exercises), toast: 'Сброшено' };
@@ -154,17 +156,15 @@ export function applyTap(session: Session, exercises: Exercise[], tap: Tap): Tap
   // tap.op === 'answer'
   if (ex.kind === 'sentence') return { view: null, toast: STALE };
   if (tap.arg >= ex.options.length) return { view: null, toast: 'Такого варианта нет' };
-  return { view: advance(session, exercises, tap.arg === ex.answer) };
+  return { view: advance(session, exercises, ex.options[tap.arg] === ex.answer) };
 }
 
 /** Записать результат шага, сдвинуть курсор и отрисовать следующий экран. */
 function advance(session: Session, exercises: Exercise[], ok: boolean): View {
   const ex = exercises[session.i];
-  const answer = correctAnswerOf(ex);
-  if (ok) session.correct++;
-  else session.missed.push(`${ex.label}: ${answer}`);
-  const feedback = ok ? `✅ ${escapeHtml(answer)}` : `❌ Верно: ${escapeHtml(answer)}`;
+  if (!ok) session.missed.push(`${ex.label}: ${ex.answer}`);
+  const feedback = ok ? `✅ ${escapeHtml(ex.answer)}` : `❌ Верно: ${escapeHtml(ex.answer)}`;
   session.i++;
   session.picked = [];
-  return isFinished(session) ? summary(session) : render(session, exercises, feedback);
+  return render(session, exercises, feedback);
 }

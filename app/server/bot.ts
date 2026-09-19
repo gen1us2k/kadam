@@ -13,9 +13,9 @@ import {
 } from './bot-state.ts';
 import { broadcast } from './broadcast.ts';
 import {
-  answerCallback, editMessageText, getUpdates, sendMessage, type SendOutcome,
+  answerCallback, editMessageText, getUpdates, isMessageGone, sendMessage, type SendOutcome,
 } from './telegram.ts';
-import { applyTap, isFinished, isLiveTap, parseTap, render } from './session.ts';
+import { applyTap, isFinished, isLiveTap, parseTap, render, STALE } from './session.ts';
 import { todayStr } from '../src/lib/daily.ts';
 
 // Optional app/.env for the token / send time / state path (see .env.example). Real env vars win.
@@ -68,8 +68,6 @@ const GREETING =
   'разобрать суффиксы и вспомнить слова дня. Отвечать — кнопками. ' +
   'Вернуться к заданию — /task, отписаться — /stop.';
 
-const STALE = 'Это уже неактуально — откройте /task';
-
 /**
  * Сегодняшние упражнения, пересобираемые при смене суток.
  *
@@ -88,6 +86,11 @@ function todayExercises() {
 /**
  * Начать или перерисовать сессию в НОВОМ сообщении. Используется и при подписке, и рассылкой,
  * и командой /task: во всех трёх случаях нужно свежее сообщение, которое дальше редактируется.
+ *
+ * Успешная отправка отмечает чату сегодняшний день — для всех трёх путей одинаково. Для /task это
+ * значит, что задание, открытое до часа рассылки, рассылку в этот день отменяет. Так и задумано:
+ * иначе пуш в 09:00 начал бы заново то же задание, которое человек, возможно, уже прошёл.
+ * (Рассылка ставит отметку ещё и ДО вызова — это её страховка от повторного входа и обрыва.)
  */
 async function startSession(chatId: number): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
   const day = todayStr();
@@ -99,10 +102,10 @@ async function startSession(chatId: number): Promise<Exclude<SendOutcome, { kind
   // осознанно: /task после «16 из 16» — это просьба потренироваться ещё, а не показать итог,
   // который и так остался в чате.
   const prev = chat.session;
-  const resumable = prev !== null && prev.day === day && !isFinished(prev);
+  const resumable = prev !== null && prev.day === day && !isFinished(prev, exercises.length);
   const fresh: Session = resumable
     ? { ...prev, picked: [] }
-    : { day, i: 0, correct: 0, missed: [], msgId: 0, picked: [] };
+    : { day, i: 0, missed: [], msgId: 0, picked: [] };
   const view = render(fresh, exercises);
   const outcome = await sendMessage(token, chatId, view.text, view.keyboard);
   if (outcome.kind === 'ok') {
@@ -137,7 +140,8 @@ async function handleTap(
     return;
   }
 
-  const result = applyTap(session, todayExercises(), tap);
+  const exercises = todayExercises();
+  const result = applyTap(session, exercises, tap);
   await answerCallback(token, callbackId, result.toast);
   if (!result.view) return;
 
@@ -149,7 +153,7 @@ async function handleTap(
     // трогать НЕЛЬЗЯ, иначе каждый обрыв плодил бы дубль сессии и уводил msgId с живого
     // сообщения. Цена: экран замирает на предыдущем вопросе, а курсор уже сдвинулся, поэтому
     // следующее нажатие по нему будет отклонено как неактуальное — выйти можно через /task.
-    if (/message (to edit )?not found|message can't be edited|MESSAGE_ID_INVALID/i.test(edited.reason)) {
+    if (isMessageGone(edited.reason)) {
       const resent = await sendMessage(token, chatId, result.view.text, result.view.keyboard);
       if (resent.kind === 'ok') session.msgId = resent.messageId;
       else if (resent.kind === 'drop') removeChat(state, chatId);
@@ -157,8 +161,12 @@ async function handleTap(
       console.error(`[bot] edit for ${chatId} failed: ${edited.reason} — the screen stays put until /task`);
     }
   }
-  await saveState(STATE_FILE, state);
-  console.log(`[bot] tap ${chatId} item ${tap.i} -> ${session.i}/16, correct ${session.correct}`);
+  // Состояние сохранит цикл опроса сразу после этого пакета обновлений — второй записи того же
+  // файла на каждое нажатие здесь не нужно.
+  console.log(
+    `[bot] tap ${chatId} item ${tap.i} -> ${session.i}/${exercises.length}, ` +
+      `correct ${session.i - session.missed.length}`,
+  );
 }
 
 async function handleCommand(chatId: number, text: string): Promise<void> {
@@ -200,7 +208,7 @@ let broadcasting = false;
 async function sendDailyTask(): Promise<void> {
   const day = todayStr();
   const r = await broadcast(state, day, {
-    start: (chatId) => startSession(chatId),
+    start: startSession,
     save: (s) => saveState(STATE_FILE, s),
     log: (line) => console.log(`[bot] ${line}`),
     gapMs: SEND_GAP_MS,

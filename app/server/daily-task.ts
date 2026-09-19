@@ -14,11 +14,6 @@ import { pickDeterministic } from '../src/lib/study-utils.ts';
 const ANKI_DIR = fileURLToPath(new URL('../../anki/', import.meta.url));
 
 const WORD_COUNT = 12;
-/** Escape the three characters Telegram's HTML parse mode treats as markup. */
-export function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
 /** Read and merge both Anki decks from the repo root. */
 export async function loadDeck(): Promise<VocabRow[]> {
   const [stepRaw, corpusRaw] = await Promise.all([

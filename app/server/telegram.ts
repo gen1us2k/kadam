@@ -1,4 +1,4 @@
-// Минимальный клиент Telegram Bot API поверх встроенного fetch — двух методов достаточно,
+// Минимальный клиент Telegram Bot API поверх встроенного fetch — четырёх методов достаточно,
 // зависимость не нужна. Классификация ответа вынесена в чистые функции: именно они решают,
 // удалять ли подписчика и стоит ли продолжать опрос, и именно они покрыты тестами без сети.
 
@@ -76,31 +76,38 @@ async function callApi(token: string, method: string, payload: unknown, signal?:
   return { status: res.status, body };
 }
 
-/** Longest retry_after worth waiting out inline; beyond it the chat is skipped for this cycle. */
+/** Longest retry_after worth waiting out inline; beyond it the call is skipped for this cycle. */
 const MAX_RETRY_AFTER_SEC = 60;
 
+/** Escape the three characters Telegram's HTML parse mode treats as markup. */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 /**
- * Send one HTML message. Retries once on 429, then reports the outcome to the caller.
- * The AbortSignal is not optional: a socket that never settles leaves broadcast() unsettled, its
- * .finally() never clears the `broadcasting` flag, and the scheduler is wedged for the lifetime of
- * the process — not merely for one cycle.
+ * Whether a failed edit means the message itself is gone — deleted, or past the 48-hour edit
+ * window — as opposed to a hiccup. Only then is it right to continue in a new message; resending
+ * on a plain transient would duplicate the session and move msgId off the live message. Pure, so
+ * the strings are pinned by tests instead of living as a regex at the call site.
  */
-export async function sendMessage(
+export function isMessageGone(reason: string): boolean {
+  return /message (to edit )?not found|message can't be edited|MESSAGE_ID_INVALID/i.test(reason);
+}
+
+/**
+ * One API call with the module's single 429 policy: wait out one bounded retry_after, retry
+ * once, never let `retry` escape. The AbortSignal is not optional: a socket that never settles
+ * leaves broadcast() unsettled, its .finally() never clears the `broadcasting` flag, and the
+ * scheduler is wedged for the lifetime of the process — not merely for one cycle.
+ */
+async function request(
   token: string,
-  chatId: number,
-  text: string,
-  keyboard?: Keyboard,
+  method: string,
+  payload: unknown,
 ): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
-  const payload = {
-    chat_id: chatId,
-    text,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
-  };
   const attempt = async (): Promise<SendOutcome> => {
     try {
-      const { status, body } = await callApi(token, 'sendMessage', payload, AbortSignal.timeout(15_000));
+      const { status, body } = await callApi(token, method, payload, AbortSignal.timeout(15_000));
       return classifyResponse(status, body);
     } catch (e) {
       return { kind: 'transient', reason: e instanceof Error ? e.message : 'network error' };
@@ -115,8 +122,40 @@ export async function sendMessage(
   }
   await sleep(first.seconds * 1000);
   const second = await attempt();
-  // `retry` never escapes: the return type makes the caller's outcome handling exhaustive.
   return second.kind === 'retry' ? { kind: 'transient', reason: 'rate limited twice' } : second;
+}
+
+const HTML = { parse_mode: 'HTML', disable_web_page_preview: true } as const;
+
+/** Send one HTML message, optionally with an inline keyboard. */
+export function sendMessage(token: string, chatId: number, text: string, keyboard?: Keyboard) {
+  return request(token, 'sendMessage', {
+    chat_id: chatId,
+    text,
+    ...HTML,
+    ...(keyboard ? { reply_markup: { inline_keyboard: keyboard } } : {}),
+  });
+}
+
+/**
+ * Replace the text and buttons of a message already sent. The whole session lives in one
+ * message, so this is how the next question appears. Shares the 429 policy with sendMessage:
+ * a fast tapper can trip the per-chat rate limit, and a dropped edit freezes the screen.
+ */
+export function editMessageText(
+  token: string,
+  chatId: number,
+  messageId: number,
+  text: string,
+  keyboard: Keyboard = [],
+) {
+  return request(token, 'editMessageText', {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    ...HTML,
+    reply_markup: { inline_keyboard: keyboard },
+  });
 }
 
 /**
@@ -134,34 +173,6 @@ export async function getUpdates(token: string, offset: number, timeoutSec = 25)
       AbortSignal.timeout((timeoutSec + 10) * 1000),
     );
     return classifyPoll(status, body as ApiBody & { result?: TelegramUpdate[] });
-  } catch (e) {
-    return { kind: 'transient', reason: e instanceof Error ? e.message : 'network error' };
-  }
-}
-
-/**
- * Заменить текст и кнопки уже отправленного сообщения. Вся сессия живёт в одном сообщении,
- * поэтому это основной способ показать следующий вопрос.
- */
-export async function editMessageText(
-  token: string,
-  chatId: number,
-  messageId: number,
-  text: string,
-  keyboard?: Keyboard,
-): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
-  const payload = {
-    chat_id: chatId,
-    message_id: messageId,
-    text,
-    parse_mode: 'HTML',
-    disable_web_page_preview: true,
-    reply_markup: { inline_keyboard: keyboard ?? [] },
-  };
-  try {
-    const { status, body } = await callApi(token, 'editMessageText', payload, AbortSignal.timeout(15_000));
-    const outcome = classifyResponse(status, body);
-    return outcome.kind === 'retry' ? { kind: 'transient', reason: 'rate limited' } : outcome;
   } catch (e) {
     return { kind: 'transient', reason: e instanceof Error ? e.message : 'network error' };
   }

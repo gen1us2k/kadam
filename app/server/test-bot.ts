@@ -7,17 +7,20 @@ import { mkdtemp, mkdir, writeFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createChecker } from './test-util.ts';
-import { buildDailyTask, escapeHtml, loadDeck } from './daily-task.ts';
+import { buildDailyTask, loadDeck } from './daily-task.ts';
 import {
   addChat, chatsDue, emptyState, isSendTime, loadState, removeChat, saveState,
   type BotState, type Session,
 } from './bot-state.ts';
 import { buildExercises, checkAssembled, type AssembleExercise, type ChoiceExercise } from './exercise.ts';
-import { applyTap, isFinished, isLiveTap, parseTap, render, summary } from './session.ts';
+import { applyTap, isFinished, isLiveTap, parseTap, render, STALE, summary } from './session.ts';
 import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
 import { makeBank } from '../src/lib/study-utils.ts';
 import { broadcast } from './broadcast.ts';
-import { classifyPoll, classifyResponse, sendMessage, type SendOutcome } from './telegram.ts';
+import {
+  classifyPoll, classifyResponse, editMessageText, escapeHtml, isMessageGone, sendMessage,
+  type SendOutcome,
+} from './telegram.ts';
 import { parseVocab, mergeVocab, cardId } from '../src/lib/vocab-parse.ts';
 import { pickSentences } from '../src/lib/sentences.ts';
 import { pickDeterministic } from '../src/lib/study-utils.ts';
@@ -79,14 +82,14 @@ addChat(st, 42);
 st.offset = 777;
 st.chats['42'] = {
   sentDay: '2026-09-19',
-  session: { day: '2026-09-19', i: 3, correct: 2, missed: ['көл: озеро'], msgId: 55, picked: [1] },
+  session: { day: '2026-09-19', i: 3, missed: ['көл: озеро'], msgId: 55, picked: [1] },
 };
 await saveState(file, st);
 const back = await loadState(file);
 check('round-trip keeps chats', Object.keys(back.chats).join() === '42', back.chats);
 check('round-trip keeps offset', back.offset === 777, back.offset);
 check('round-trip keeps sentDay', back.chats['42'].sentDay === '2026-09-19', back.chats['42']);
-check('round-trip keeps the session cursor', back.chats['42'].session?.i === 3 && back.chats['42'].session?.correct === 2, back.chats['42'].session);
+check('round-trip keeps the session cursor', back.chats['42'].session?.i === 3 && back.chats['42'].session?.msgId === 55, back.chats['42'].session);
 check('round-trip keeps missed labels', back.chats['42'].session?.missed.join() === 'көл: озеро');
 check('no .tmp left behind', (await readdir(join(dir, 'nested'))).join() === 'bot-state.json', await readdir(join(dir, 'nested')));
 
@@ -229,7 +232,19 @@ script([rateLimited(61)]);
 check('61 s is already too long', (await sendMessage('t', 1, 'x')).kind === 'transient' && calls === 1, calls);
 script([() => { throw new Error('socket hang up'); }]);
 check('network error -> transient', (await sendMessage('t', 1, 'x')).kind === 'transient');
+// Правка сообщения делит политику 429 с отправкой: быстрые нажатия упираются в лимит чата, а
+// потерянная правка замораживает экран до /task.
+script([rateLimited(0), () => reply(200, { ok: true, result: { message_id: 9 } })]);
+const edited = await editMessageText('t', 1, 9, 'x');
+check('a rate-limited edit is retried once', edited.kind === 'ok' && calls === 2, calls);
 globalThis.fetch = realFetch;
+
+// --- isMessageGone: только «сообщения больше нет» даёт право продолжить в новом ---
+check('deleted message is gone', isMessageGone('Bad Request: message to edit not found'));
+check('too old to edit is gone', isMessageGone("Bad Request: message can't be edited"));
+check('a no-op edit is NOT gone', !isMessageGone('Bad Request: message is not modified'));
+check('a network hiccup is NOT gone', !isMessageGone('fetch failed'));
+check('a server error is NOT gone', !isMessageGone('http 500'));
 
 // --- pickDeterministic never hands out the caller's own array ---
 const tiny = ['a', 'b'];
@@ -290,9 +305,14 @@ const CONSONANTAL = ['Множественное число', 'Где? (жаты
 const VOWEL_ONLY = ['Настоящее (-ып жатат)', 'Будущее (-ат)'];
 let thin = 0;
 let wrongAxis = 0;
+// Подпись типа здесь — ключ: переименуй её в morphology.ts, и buildDrills вернёт пустой список,
+// цикл не выполнится ни разу, а обе проверки ниже пройдут вхолостую. Поэтому считаем дриллы.
+const swept: Record<string, number> = {};
 for (const t of [...CONSONANTAL, ...VOWEL_ONLY]) {
+  swept[t] = 0;
   for (let sd = 1; sd <= 40; sd++) {
     for (const d of buildDrills(20, sd, [t])) {
+      swept[t]++;
       const o = drillOptions(d, sd);
       if (o.length !== 4 || new Set(o).size !== 4 || !o.includes(d.answer)) thin++;
       // Позиция сразу за основой. У суффикса с согласной там согласная, и отличаться в ней
@@ -304,6 +324,7 @@ for (const t of [...CONSONANTAL, ...VOWEL_ONLY]) {
     }
   }
 }
+check('the sweep actually reached all eight drill types', Object.values(swept).length === 8 && Object.values(swept).every((n) => n > 0), swept);
 check('every drill type yields four distinct options', thin === 0, thin);
 check('one assimilation error where the suffix has a consonant, three harmony errors where it has none', wrongAxis === 0, wrongAxis);
 
@@ -322,7 +343,7 @@ check('three drills follow', exercises.slice(1, 4).every((e) => e.kind === 'dril
 check('twelve words close it', exercises.slice(4).every((e) => e.kind === 'word') && exercises.slice(4).length === 12);
 const choices = exercises.slice(1) as ChoiceExercise[];
 check('every choice has four options', choices.every((e) => e.options.length === 4));
-check('every choice has exactly one correct index', choices.every((e) => e.answer >= 0 && e.answer < 4));
+check('every choice lists its answer exactly once', choices.every((e) => e.options.filter((o) => o === e.answer).length === 1));
 check('no choice repeats an option', choices.every((e) => new Set(e.options).size === 4));
 check('exercises are deterministic', JSON.stringify(buildExercises(task16, deck)) === JSON.stringify(exercises));
 // Вопрос не должен подсказывать ответ. Единственное законное исключение — заимствования, где
@@ -330,17 +351,12 @@ check('exercises are deterministic', JSON.stringify(buildExercises(task16, deck)
 // колоды). Прятать их незачем — это и есть верный ответ, — но и выдавать за утечку тоже нельзя,
 // поэтому исключение названо явно, а для дриллов правило остаётся безусловным.
 const drillsOnly = exercises.slice(1, 4) as ChoiceExercise[];
-check('a drill prompt never contains its answer', drillsOnly.every((e) => !e.prompt.includes(e.options[e.answer])));
+check('a drill prompt never contains its answer', drillsOnly.every((e) => !e.prompt.includes(e.answer)));
 const wordsOnly = exercises.slice(4) as ChoiceExercise[];
 check(
   'a word prompt contains its answer only when the two languages spell it the same',
-  wordsOnly.every((e) => {
-    const answer = e.options[e.answer];
-    return !e.prompt.includes(answer) || e.prompt === `Что значит «${answer}»?`;
-  }),
+  wordsOnly.every((e) => !e.prompt.includes(e.answer) || e.prompt === `Что значит «${e.answer}»?`),
 );
-// Ни один дистрактор не совпадает с верным ответом — иначе у вопроса было бы два верных варианта.
-check('no distractor equals the answer', choices.every((e) => e.options.filter((o) => o === e.options[e.answer]).length === 1));
 
 // --- сборка предложения: повтор слова не даёт ложной ошибки ---
 const dup = { kind: 'sentence', prompt: 'p', bank: makeBank(['мен', 'аны', 'мен'], 3), answer: 'мен аны мен', label: 'l' } as AssembleExercise;
@@ -357,27 +373,29 @@ check('negative index rejected', parseTap('a:2026-09-20:-1:0') === null);
 check('non-numeric arg rejected', parseTap('a:2026-09-20:0:abc') === null);
 
 // --- машина сессии ---
-const s0: Session = { day: '2026-09-20', i: 1, correct: 0, missed: [], msgId: 10, picked: [] };
+const s0: Session = { day: '2026-09-20', i: 1, missed: [], msgId: 10, picked: [] };
+const score = (x: Session) => x.i - x.missed.length;
 const d1 = exercises[1] as ChoiceExercise;
-const right = applyTap({ ...s0 }, exercises, { op: 'answer', day: s0.day, i: 1, arg: d1.answer });
+const rightIdx = d1.options.indexOf(d1.answer);
+const right = applyTap({ ...s0 }, exercises, { op: 'answer', day: s0.day, i: 1, arg: rightIdx });
 check('a correct answer advances and shows feedback', right.view !== null && right.view.text.includes('✅'));
 const sWrong: Session = { ...s0, missed: [] };
-applyTap(sWrong, exercises, { op: 'answer', day: s0.day, i: 1, arg: (d1.answer + 1) % 4 });
-check('a wrong answer is recorded', sWrong.correct === 0 && sWrong.missed.length === 1, sWrong.missed);
+applyTap(sWrong, exercises, { op: 'answer', day: s0.day, i: 1, arg: (rightIdx + 1) % 4 });
+check('a wrong answer is recorded', sWrong.missed.length === 1 && sWrong.missed[0].endsWith(d1.answer), sWrong.missed);
 check('a wrong answer still advances', sWrong.i === 2, sWrong.i);
 const sCount: Session = { ...s0, missed: [] };
-applyTap(sCount, exercises, { op: 'answer', day: s0.day, i: 1, arg: d1.answer });
-check('a correct answer scores once', sCount.correct === 1 && sCount.i === 2);
+applyTap(sCount, exercises, { op: 'answer', day: s0.day, i: 1, arg: rightIdx });
+check('a correct answer advances without a miss', sCount.i === 2 && sCount.missed.length === 0);
 const before = JSON.stringify(sCount);
-const stale = applyTap(sCount, exercises, { op: 'answer', day: s0.day, i: 1, arg: d1.answer });
-check('a repeat tap changes nothing', JSON.stringify(sCount) === before && stale.view === null, stale.toast);
+const stale = applyTap(sCount, exercises, { op: 'answer', day: s0.day, i: 1, arg: rightIdx });
+check('a repeat tap changes nothing', JSON.stringify(sCount) === before && stale.view === null && stale.toast === STALE, stale.toast);
 const old = applyTap({ ...sCount }, exercises, { op: 'answer', day: '2026-09-19', i: 2, arg: 0 });
 check('yesterday tap is refused', old.view === null && typeof old.toast === 'string');
 const oob = applyTap({ ...s0 }, exercises, { op: 'answer', day: s0.day, i: 1, arg: 99 });
 check('out-of-range option is refused', oob.view === null, oob.toast);
 
 // --- сборка предложения в сессии ---
-const sSent: Session = { day: '2026-09-20', i: 0, correct: 0, missed: [], msgId: 1, picked: [] };
+const sSent: Session = { day: '2026-09-20', i: 0, missed: [], msgId: 1, picked: [] };
 const bank = (exercises[0] as AssembleExercise).bank;
 // Снимок экрана сборки ДО того, как цикл ниже сдвинет курсор: только здесь встречаются
 // кодировки `w:` и `reset:`, длину которых проверяет AC-14.
@@ -397,13 +415,15 @@ check('resetting an empty pick is a no-op', emptyReset.view === null, emptyReset
 for (const id of [...Array(bank.length).keys()]) {
   applyTap(sSent, exercises, { op: 'word', day: sSent.day, i: 0, arg: id });
 }
-check('assembling in order scores and advances', sSent.i === 1 && sSent.correct === 1, sSent);
+check('assembling in order scores and advances', sSent.i === 1 && score(sSent) === 1, sSent);
 
 // --- итог ---
-const done16: Session = { day: '2026-09-20', i: 16, correct: 14, missed: ['көл: озеро'], msgId: 1, picked: [] };
-check('finished session is detected', isFinished(done16));
-const fin = summary(done16);
-check('summary shows the score', fin.text.includes('14 из 16'), fin.text);
+const done16: Session = { day: '2026-09-20', i: 16, missed: ['көл: озеро', 'үй → Куда? (барыш): үйгө'], msgId: 1, picked: [] };
+check('finished session is detected', isFinished(done16, exercises.length) && !isFinished(s0, exercises.length));
+const fin = summary(done16, exercises.length);
+// Счёт выводится как «отвечено минус промахи»: 16 − 2.
+check('summary derives the score from the misses', fin.text.includes('14 из 16'), fin.text);
+check('render past the last exercise is the summary', render(done16, exercises).text === fin.text);
 check('summary lists the misses', fin.text.includes('көл: озеро'));
 check('summary has no buttons', fin.keyboard.length === 0);
 
@@ -414,7 +434,7 @@ check('every kind of callback_data is measured', allData.some((d) => d.startsWit
 check('every callback_data is under 64 bytes', allData.every((d) => Buffer.byteLength(d) < 64), Math.max(0, ...allData.map((d) => Buffer.byteLength(d))));
 
 // --- isLiveTap: та самая строка, которой закрыт stale-session ---
-const liveS: Session = { day: '2026-09-20', i: 2, correct: 1, missed: [], msgId: 77, picked: [] };
+const liveS: Session = { day: '2026-09-20', i: 2, missed: [], msgId: 77, picked: [] };
 check('the live message on the live day is accepted', isLiveTap(liveS, 77, '2026-09-20') === true);
 check('a foreign message id is refused', isLiveTap(liveS, 78, '2026-09-20') === false);
 // Брошенная вчерашняя сессия: то же сообщение, но день сменился. Без этой проверки тап зачёлся
