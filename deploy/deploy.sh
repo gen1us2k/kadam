@@ -26,7 +26,10 @@ log "syncing repo + models to $HOST:$REMOTE_DIR"
 rsync -az --delete --info=progress2 \
   --exclude '.git' --exclude 'node_modules' --exclude 'dist' --exclude '.astro' \
   --exclude '.venv' --exclude '.env' \
+  --exclude '/app/data' \
   "$ROOT/" "$HOST:$REMOTE_DIR/"
+# /app/data is the bot's LOCAL dev state (subscribers, session cursors). Production state lives in
+# /var/lib/kadam, so shipping the dev file would only put a stray copy of chat ids on the server.
 
 log "installing deps, building, restarting on the droplet"
 ssh "$HOST" "bash -euo pipefail -s" <<REMOTE
