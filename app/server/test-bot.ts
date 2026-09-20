@@ -20,6 +20,7 @@ import {
   GRAMMAR_TRACKS, type AssembleExercise, type ChoiceExercise,
 } from './exercise.ts';
 import { addToPractice, graduatePractice, practiceSeed, selectPractice, wordCardId, PRACTICE_CAP } from './practice.ts';
+import { BOT_COMMANDS, commandsHelp } from './commands.ts';
 import { applyTap, isFinished, isLiveTap, parseTap, render, STALE, summary } from './session.ts';
 import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
 import { makeBank } from '../src/lib/study-utils.ts';
@@ -650,6 +651,16 @@ const gBack = await loadState(gFile);
 check('round-trip keeps a grammar session', gBack.chats['3'].session?.mode === 'grammar' && gBack.chats['3'].session?.track === 1 && gBack.chats['3'].session?.seed === 4242, gBack.chats['3'].session);
 await writeFile(gFile, JSON.stringify({ offset: 0, chats: { '4': { sentDay: null, cursor: 0, practice: [], session: { n: 5, mode: 'bogus', i: 0, missed: [], msgId: 1, picked: [] } } } }), 'utf8');
 check('unknown session mode migrates to lesson', (await loadState(gFile)).chats['4'].session?.mode === 'lesson');
+
+// --- bot commands / menu (Stage 3) ---
+check('BOT_COMMANDS covers the real commands',
+  ['task', 'next', 'practice', 'grammar', 'stop'].every((c) => BOT_COMMANDS.some((b) => b.command === c)), BOT_COMMANDS.map((b) => b.command));
+check('no command carries a leading slash (Bot API wants bare names)', BOT_COMMANDS.every((c) => !c.command.startsWith('/')));
+check('command names match the Bot API pattern', BOT_COMMANDS.every((c) => /^[a-z0-9_]{1,32}$/.test(c.command)), BOT_COMMANDS.map((b) => b.command));
+check('descriptions are non-empty and within 256 chars', BOT_COMMANDS.every((c) => c.description.length > 0 && c.description.length <= 256));
+check('descriptions stay HTML-safe (rendered under parse_mode HTML)', BOT_COMMANDS.every((c) => !/[<>&]/.test(c.description)));
+const help = commandsHelp();
+check('commandsHelp lists every command as /cmd — desc', BOT_COMMANDS.every((c) => help.includes(`/${c.command} — ${c.description}`)), help);
 
 await rm(dir, { recursive: true, force: true });
 done('BOT OK');

@@ -3,6 +3,7 @@
 // удалять ли подписчика и стоит ли продолжать опрос, и именно они покрыты тестами без сети.
 
 import { setTimeout as sleep } from 'node:timers/promises';
+import type { BotCommand } from './commands.ts';
 
 const API = 'https://api.telegram.org';
 
@@ -192,5 +193,17 @@ export async function answerCallback(token: string, callbackId: string, text?: s
     );
   } catch {
     /* уведомление, а не шаг сессии: сбой здесь не должен ничего ронять */
+  }
+}
+
+/**
+ * Зарегистрировать меню команд бота (кнопка «/» в клиенте). Fire-and-forget, как answerCallback:
+ * это косметика — её сбой не должен ронять бот или блокировать старт. Вызывается один раз при старте.
+ */
+export async function setMyCommands(token: string, commands: BotCommand[]): Promise<void> {
+  try {
+    await callApi(token, 'setMyCommands', { commands }, AbortSignal.timeout(15_000));
+  } catch {
+    /* меню — необязательная косметика: сбой здесь ничего не роняет */
   }
 }

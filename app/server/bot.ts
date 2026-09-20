@@ -17,8 +17,9 @@ import {
 } from './practice.ts';
 import { broadcast } from './broadcast.ts';
 import {
-  answerCallback, editMessageText, getUpdates, isMessageGone, sendMessage, type SendOutcome,
+  answerCallback, editMessageText, getUpdates, isMessageGone, sendMessage, setMyCommands, type SendOutcome,
 } from './telegram.ts';
+import { BOT_COMMANDS, commandsHelp } from './commands.ts';
 import { applyTap, isFinished, isLiveTap, parseTap, render, STALE } from './session.ts';
 import { cardId } from '../src/lib/vocab-parse.ts';
 import { todayStr } from '../src/lib/daily.ts';
@@ -68,11 +69,15 @@ console.log(
     `(${Intl.DateTimeFormat().resolvedOptions().timeZone}), deck ${deck.length} words, state ${STATE_FILE}`,
 );
 
+// Зарегистрировать меню команд (кнопка «/» в клиенте). Fire-and-forget: старт не ждёт и не падает
+// из-за косметики — опрос ниже начнётся независимо от исхода.
+void setMyCommands(token, BOT_COMMANDS);
+
+// Приветствие + список команд из единого источника (commands.ts): меню Telegram и этот текст не
+// разойдутся. Отвечать на задания — кнопками; команды перечислены ниже.
 const GREETING =
   'Салам! Раз в сутки я буду присылать урок по кыргызскому: собрать предложение, ' +
-  'разобрать суффиксы и вспомнить слова. Отвечать — кнопками. Хочешь быстрее — /next ' +
-  '(или кнопка «Дальше ▶»). Тренировка ошибок и добавленных слов — /practice. ' +
-  'Грамматика по темам — /grammar. Повторить текущий урок — /task, отписаться — /stop.';
+  'разобрать суффиксы и вспомнить слова. Отвечать — кнопками.\n\nКоманды:\n' + commandsHelp();
 
 /** Идентичность сессии-тренировки: константа далеко выше любого номера урока, поэтому устаревший
  *  тап урока (маленький n) никогда не совпадёт с живой тренировкой по guard tap.n. */
@@ -286,7 +291,8 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
   if (cmd === '/start') {
     const added = addChat(state, chatId);
     await saveState(STATE_FILE, state);
-    if (added) await sendMessage(token, chatId, GREETING);
+    // /start всегда показывает приветствие со списком команд (и новым, и вернувшимся) — как просили.
+    await sendMessage(token, chatId, GREETING);
     // Подписка сразу даёт текущий урок (для нового — урок 0): ждать до утра незачем. Без продвижения.
     // Читаем чат заново под null-check: /stop мог прийти, пока шли await выше.
     const chat = state.chats[String(chatId)];
@@ -322,6 +328,9 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
     const menu = grammarMenu();
     await sendMessage(token, chatId, menu.text, menu.keyboard);
     console.log(`[bot] /grammar ${chatId} (menu)`);
+  } else if (cmd === '/help') {
+    // Список команд для всех (подписка не нужна) — из того же источника, что и меню Telegram.
+    await sendMessage(token, chatId, 'Команды:\n' + commandsHelp());
   }
   // Anything else is ignored on purpose: the bot never echoes user input.
 }
