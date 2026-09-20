@@ -23,7 +23,7 @@ if [[ ! -f "$ROOT/app/models/model.onnx" || ! -f "$ROOT/app/models/tts/model.onn
 fi
 
 log "syncing repo + models to $HOST:$REMOTE_DIR"
-rsync -az --delete --info=progress2 \
+rsync -az --delete --progress \
   --exclude '.git' --exclude 'node_modules' --exclude 'dist' --exclude '.astro' \
   --exclude '.venv' --exclude '.env' \
   --exclude '/app/data' \
@@ -36,7 +36,9 @@ ssh "$HOST" "bash -euo pipefail -s" <<REMOTE
   chown -R $APP_USER:$APP_USER "$REMOTE_DIR"
   cd "$REMOTE_DIR/app"
   # -H sets HOME=/home/$APP_USER so npm's cache doesn't hit /root/.npm (EACCES).
-  sudo -Hu $APP_USER npm ci
+  # --onnxruntime-node-install=skip: don't pull the CUDA EP (~hundreds of MB) — the app runs CPU
+  # inference and extracting the GPU providers OOM-kills a 2 GB box (npm exit 137).
+  sudo -Hu $APP_USER npm ci --onnxruntime-node-install=skip
   sudo -Hu $APP_USER npm run build
   systemctl restart kadam
   # The bot is optional. Without /etc/kadam-bot.env it exits 78 and RestartPreventExitStatus=78
