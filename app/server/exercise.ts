@@ -4,7 +4,7 @@
 
 import { drillOptions } from '../src/lib/morphology.ts';
 import { makeBank, rng, shuffle, type Chip } from '../src/lib/study-utils.ts';
-import type { VocabRow } from '../src/lib/vocab-parse.ts';
+import { cardId, type VocabRow } from '../src/lib/vocab-parse.ts';
 import type { DailyTask } from './daily-task.ts';
 
 /** Сколько вариантов у упражнения с выбором. */
@@ -87,6 +87,28 @@ export function buildExercises(task: DailyTask, deck: VocabRow[]): Exercise[] {
     });
   }
 
+  return out;
+}
+
+/**
+ * Упражнения тренировки: по одному словарному упражнению на каждую карточку набора. cardId ищем
+ * в колоде; отсутствующие (колода могла измениться) пропускаем. Порядок вариантов — из seed, чтобы
+ * пересбор на каждом нажатии и после рестарта давал тот же экран.
+ */
+export function buildPracticeExercises(deck: VocabRow[], cards: string[], seed: number): Exercise[] {
+  const byId = new Map(deck.map((r) => [cardId(r), r]));
+  const out: Exercise[] = [];
+  for (const id of cards) {
+    const row = byId.get(id);
+    if (!row) continue;
+    out.push({
+      kind: 'word',
+      prompt: `Что значит «${row.kg}»?`,
+      options: wordOptions(deck, row, exerciseSeed(seed, out.length)),
+      answer: row.ru,
+      label: row.kg,
+    });
+  }
   return out;
 }
 

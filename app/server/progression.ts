@@ -26,7 +26,7 @@ export const commitCursor = (current: number, delivered: number): number => Math
  */
 export function lessonSession(prev: Session | null, n: number, total: number): Session {
   const resumable = prev !== null && prev.n === n && !isFinished(prev, total);
-  return resumable ? { ...prev, picked: [] } : { n, i: 0, missed: [], msgId: 0, picked: [] };
+  return resumable ? { ...prev, picked: [] } : { n, mode: 'lesson', i: 0, missed: [], msgId: 0, picked: [] };
 }
 
 /**

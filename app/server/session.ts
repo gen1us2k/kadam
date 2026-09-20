@@ -10,7 +10,9 @@ export type Tap =
   | { op: 'answer'; n: number; i: number; arg: number }
   | { op: 'word'; n: number; i: number; arg: number }
   | { op: 'reset'; n: number; i: number }
-  | { op: 'next'; n: number };
+  | { op: 'next'; n: number }
+  | { op: 'add'; n: number; i: number }   // «➕ в тренировку» — обрабатывается в bot.ts
+  | { op: 'practice' };                    // «🎯 Тренировка» / старт тренировки — в bot.ts
 
 /**
  * Разбор callback_data. Значение приходит от клиента, а не от нас, поэтому ничему в нём верить
@@ -19,6 +21,7 @@ export type Tap =
  */
 export function parseTap(data: string): Tap | null {
   const [op, rawN, rawI, rawArg] = data.split(':');
+  if (op === 'practice') return { op: 'practice' }; // старт тренировки — без числовых полей
   // Только цифры: Number('') === 0, и пустое поле иначе разобралось бы как индекс 0.
   const digits = /^\d+$/;
   if (!digits.test(rawN ?? '')) return null;
@@ -26,6 +29,7 @@ export function parseTap(data: string): Tap | null {
   if (op === 'next') return { op: 'next', n };
   if (!digits.test(rawI ?? '')) return null;
   const i = Number(rawI);
+  if (op === 'add') return { op: 'add', n, i };
   if (op === 'reset') return { op: 'reset', n, i };
   if (!digits.test(rawArg ?? '')) return null;
   const arg = Number(rawArg);
@@ -34,8 +38,11 @@ export function parseTap(data: string): Tap | null {
   return null;
 }
 
-const encode = (op: string, n: number, i?: number, arg?: number) =>
-  i === undefined ? `${op}:${n}` : arg === undefined ? `${op}:${n}:${i}` : `${op}:${n}:${i}:${arg}`;
+const encode = (op: string, n?: number, i?: number, arg?: number) =>
+  n === undefined ? op
+  : i === undefined ? `${op}:${n}`
+  : arg === undefined ? `${op}:${n}:${i}`
+  : `${op}:${n}:${i}:${arg}`;
 
 export interface View {
   text: string;
@@ -50,8 +57,11 @@ function rows<T>(items: T[], width: number): T[][] {
 }
 
 /** Заголовок с прогрессом плюс необязательная строка отклика на прошлый ответ. */
+/** Заголовок по режиму: урок несёт номер, тренировка — своё имя. */
+const title = (s: Session): string => (s.mode === 'practice' ? '🎯 <b>Тренировка</b>' : `🇰🇬 <b>Урок ${s.n + 1}</b>`);
+
 function header(session: Session, total: number, feedback?: string): string {
-  const progress = `🇰🇬 <b>Урок ${session.n + 1}</b> · ${session.i + 1}/${total}`;
+  const progress = `${title(session)} · ${session.i + 1}/${total}`;
   return feedback ? `${progress}\n${feedback}\n` : `${progress}\n`;
 }
 
@@ -78,20 +88,22 @@ export function render(session: Session, exercises: Exercise[], feedback?: strin
   }
 
   const icon = ex.kind === 'drill' ? '⚙️' : '📖';
-  return {
-    text: `${head}\n${icon} ${e(ex.prompt)}`,
-    keyboard: rows(
-      ex.options.map((opt, k) => ({ text: opt, callback_data: encode('a', session.n, session.i, k) })),
-      2,
-    ),
-  };
+  const keyboard = rows(
+    ex.options.map((opt, k) => ({ text: opt, callback_data: encode('a', session.n, session.i, k) })),
+    2,
+  );
+  // «➕ в тренировку» — только на словарном упражнении УРОКА (в тренировке слово уже в наборе).
+  if (ex.kind === 'word' && session.mode === 'lesson') {
+    keyboard.push([{ text: '➕ в тренировку', callback_data: encode('add', session.n, session.i) }]);
+  }
+  return { text: `${head}\n${icon} ${e(ex.prompt)}`, keyboard };
 }
 
 /** Итоговый экран: счёт и разбор того, что не получилось. */
 export function summary(session: Session, total: number, feedback?: string): View {
   const lines = [
-    `🇰🇬 <b>Урок ${session.n + 1}</b> — готово`,
-    // Отклик на последний ответ: без него шестнадцатое упражнение осталось бы без ✅/❌.
+    `${title(session)} — готово`,
+    // Отклик на последний ответ: без него последнее упражнение осталось бы без ✅/❌.
     ...(feedback ? [feedback] : []),
     // Верных — всё отвеченное минус промахи; отдельного счётчика нет намеренно (см. Session).
     `<b>${session.i - session.missed.length} из ${total}</b>`,
@@ -99,10 +111,20 @@ export function summary(session: Session, total: number, feedback?: string): Vie
   if (session.missed.length > 0) {
     lines.push('', 'Не получилось:', ...session.missed.map((m) => `• ${escapeHtml(m)}`));
   }
-  lines.push('', 'Дальше — кнопкой ниже или /next. Повторить этот урок — /task.');
-  // «Дальше ▶» несёт текущий номер урока: bot.ts двигает курсор, только если он всё ещё n
-  // (защита от повторного/устаревшего нажатия по старому итогу).
-  return { text: lines.join('\n'), keyboard: [[{ text: 'Дальше ▶', callback_data: encode('next', session.n) }]] };
+  if (session.mode === 'practice') {
+    lines.push('', 'Верные ушли из набора, ошибки остались. Ещё раз — /practice.');
+    return { text: lines.join('\n'), keyboard: [[{ text: '🎯 Ещё', callback_data: encode('practice') }]] };
+  }
+  lines.push('', 'Дальше — кнопкой ниже или /next. Тренировка ошибок и слов — /practice.');
+  // «Дальше ▶» несёт текущий номер урока (bot.ts двигает курсор только если он всё ещё n);
+  // «🎯 Тренировка» стартует прогон персонального набора.
+  return {
+    text: lines.join('\n'),
+    keyboard: [[
+      { text: 'Дальше ▶', callback_data: encode('next', session.n) },
+      { text: '🎯 Тренировка', callback_data: encode('practice') },
+    ]],
+  };
 }
 
 /**
@@ -136,8 +158,9 @@ export const STALE = 'Это уже неактуально — откройте 
  * упражнению и подделанные клиентом строки.
  */
 export function applyTap(session: Session, exercises: Exercise[], tap: Tap): TapResult {
-  // «Дальше ▶» — не ход внутри сессии; его маршрутизирует bot.ts до applyTap. Защитно гасим.
-  if (tap.op === 'next') return { view: null, toast: STALE };
+  // next/add/practice — не ходы внутри сессии; их маршрутизирует bot.ts до applyTap. Защитно гасим
+  // и заодно сужаем тип tap до answer/word/reset (у которых есть n/i) для строк ниже.
+  if (tap.op === 'next' || tap.op === 'add' || tap.op === 'practice') return { view: null, toast: STALE };
   const ex = exercises[session.i];
   // `!ex` покрывает и доигранную сессию: за последним упражнением элемента нет.
   if (tap.n !== session.n || tap.i !== session.i || !ex) return { view: null, toast: STALE };

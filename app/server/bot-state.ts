@@ -16,6 +16,12 @@ export interface Session {
    * (деплой, меняющий anki/*.csv, сдвинет слова под живым курсором — принятый риск).
    */
   n: number;
+  /** Режим: обычный урок или персональная тренировка. Старые сессии мигрируют в 'lesson'. */
+  mode: 'lesson' | 'practice';
+  /** Тренировка: замороженный снимок cardId, по которому сессия пересобирает упражнения. */
+  cards?: string[];
+  /** Тренировка: сид порядка вариантов (из practiceSeed). */
+  seed?: number;
   /** Номер текущего упражнения; он же — число уже отвеченных. */
   i: number;
   /**
@@ -36,6 +42,8 @@ export interface ChatState {
   sentDay: string | null;
   /** Текущий (последний выданный) номер урока. Новый подписчик — 0. */
   cursor: number;
+  /** Персональный набор для тренировки: cardId (`kg|ru`), порядок = порядок добавления. */
+  practice: string[];
   session: Session | null;
 }
 
@@ -64,6 +72,12 @@ function chatFrom(raw: unknown): ChatState {
     s && Number.isFinite(s.n) && Number.isFinite(s.i)
       ? {
           n: num(s.n),
+          // Старые сессии без mode — это урок (тренировки до этого релиза не было).
+          mode: s.mode === 'practice' ? 'practice' : 'lesson',
+          ...(Array.isArray(s.cards)
+            ? { cards: s.cards.filter((c): c is string => typeof c === 'string') }
+            : {}),
+          ...(Number.isFinite(s.seed) ? { seed: num(s.seed) } : {}),
           i: num(s.i),
           missed: Array.isArray(s.missed) ? s.missed.filter((m) => typeof m === 'string') : [],
           msgId: num(s.msgId),
@@ -73,6 +87,7 @@ function chatFrom(raw: unknown): ChatState {
   return {
     sentDay: typeof r.sentDay === 'string' ? r.sentDay : null,
     cursor: num(r.cursor), // отсутствует у старых записей → 0
+    practice: Array.isArray(r.practice) ? r.practice.filter((c): c is string => typeof c === 'string') : [],
     session,
   };
 }
@@ -91,7 +106,7 @@ function chatsFrom(parsed: { chats?: unknown; lastSentDay?: unknown }): Record<s
   if (Array.isArray(parsed.chats)) {
     const sentDay = typeof parsed.lastSentDay === 'string' ? parsed.lastSentDay : null;
     for (const id of parsed.chats) {
-      if (Number.isFinite(id)) out[String(id)] = { sentDay, cursor: 0, session: null };
+      if (Number.isFinite(id)) out[String(id)] = { sentDay, cursor: 0, practice: [], session: null };
     }
     return out;
   }
@@ -175,7 +190,7 @@ export function saveState(path: string, state: BotState): Promise<void> {
 export function addChat(state: BotState, chatId: number): boolean {
   const key = String(chatId);
   if (state.chats[key]) return false;
-  state.chats[key] = { sentDay: null, cursor: 0, session: null };
+  state.chats[key] = { sentDay: null, cursor: 0, practice: [], session: null };
   return true;
 }
 

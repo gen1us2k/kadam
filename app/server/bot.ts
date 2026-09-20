@@ -7,16 +7,20 @@
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { buildLesson, loadDeck } from './daily-task.ts';
-import { buildExercises } from './exercise.ts';
+import { buildExercises, buildPracticeExercises } from './exercise.ts';
 import {
-  addChat, chatsDue, isSendTime, loadState, removeChat, saveState,
+  addChat, chatsDue, isSendTime, loadState, removeChat, saveState, type Session,
 } from './bot-state.ts';
 import { advanceTarget, commitDelivery, lessonSession, shouldAdvanceFromButton } from './progression.ts';
+import {
+  addToPractice, graduatePractice, practiceSeed, selectPractice, wordCardId, PRACTICE_SESSION_SIZE,
+} from './practice.ts';
 import { broadcast } from './broadcast.ts';
 import {
   answerCallback, editMessageText, getUpdates, isMessageGone, sendMessage, type SendOutcome,
 } from './telegram.ts';
-import { applyTap, isLiveTap, parseTap, render, STALE } from './session.ts';
+import { applyTap, isFinished, isLiveTap, parseTap, render, STALE } from './session.ts';
+import { cardId } from '../src/lib/vocab-parse.ts';
 import { todayStr } from '../src/lib/daily.ts';
 
 // Optional app/.env for the token / send time / state path (see .env.example). Real env vars win.
@@ -67,7 +71,12 @@ console.log(
 const GREETING =
   'Салам! Раз в сутки я буду присылать урок по кыргызскому: собрать предложение, ' +
   'разобрать суффиксы и вспомнить слова. Отвечать — кнопками. Хочешь быстрее — /next ' +
-  '(или кнопка «Дальше ▶»). Повторить текущий урок — /task, отписаться — /stop.';
+  '(или кнопка «Дальше ▶»). Тренировка ошибок и добавленных слов — /practice. ' +
+  'Повторить текущий урок — /task, отписаться — /stop.';
+
+/** Идентичность сессии-тренировки: константа далеко выше любого номера урока, поэтому устаревший
+ *  тап урока (маленький n) никогда не совпадёт с живой тренировкой по guard tap.n. */
+const PRACTICE_N = 1_000_000_000;
 
 /**
  * Упражнения урока N. Кэш по номеру урока (bounded): разные чаты — на разных уроках, поэтому кэш
@@ -112,6 +121,59 @@ async function deliverLesson(chatId: number, n: number): Promise<Exclude<SendOut
   return outcome;
 }
 
+/** Упражнения текущей сессии по её режиму: урок — из номера, тренировка — из замороженного снимка. */
+function sessionExercises(session: Session): ReturnType<typeof buildExercises> {
+  return session.mode === 'practice'
+    ? buildPracticeExercises(deck, session.cards ?? [], session.seed ?? 0)
+    : lessonExercises(session.n);
+}
+
+/**
+ * Старт тренировки: прогон персонального набора словарными упражнениями. Упражнения строим ПЕРВЫМИ
+ * и в session.cards кладём ТОЛЬКО те карточки, что дали упражнение (остальные выпали из колоды),
+ * чтобы выпуск (graduatePractice) не выпустил непройденную карточку. Пустой набор — сообщение, без
+ * сессии. Тренировка НЕ трогает курс/sentDay: это отдельный режим поверх прогрессии уроков.
+ */
+async function startPractice(chatId: number): Promise<void> {
+  const chat = state.chats[String(chatId)];
+  if (!chat) { await sendMessage(token, chatId, 'Сначала подпишитесь — /start.'); return; }
+  const selected = selectPractice(chat.practice, PRACTICE_SESSION_SIZE);
+  const seed = practiceSeed(selected);
+  const exercises = buildPracticeExercises(deck, selected, seed);
+  if (exercises.length === 0) {
+    await sendMessage(token, chatId,
+      'Тренировка пуста. Добавляй слова кнопкой «➕ в тренировку» на словарных упражнениях — ' +
+      'и ошибки из уроков тоже попадут сюда.');
+    return;
+  }
+  const cards = exercises.map((ex) => cardId({ kg: ex.label, ru: (ex as { answer: string }).answer }));
+  const fresh: Session = { n: PRACTICE_N, mode: 'practice', cards, seed, i: 0, missed: [], msgId: 0, picked: [] };
+  const view = render(fresh, exercises);
+  const outcome = await sendMessage(token, chatId, view.text, view.keyboard);
+  if (outcome.kind === 'ok') {
+    fresh.msgId = outcome.messageId;
+    chat.session = fresh;
+    await saveState(STATE_FILE, state);
+  }
+  console.log(`[bot] /practice ${chatId} — ${cards.length} card(s)`);
+}
+
+/**
+ * «➕ в тренировку»: добавить слово текущего словарного упражнения в персональный набор. cardId
+ * берём прямо из упражнения (label=kg, answer=ru) — без поиска по колоде. Отвечаем ровно один раз.
+ */
+async function handleAdd(chatId: number, callbackId: string, n: number, i: number): Promise<void> {
+  const chat = state.chats[String(chatId)];
+  const ex = chat ? lessonExercises(n)[i] : undefined;
+  const id = ex ? wordCardId(ex) : null;
+  if (!chat || !id) { await answerCallback(token, callbackId, STALE); return; }
+  const before = chat.practice.length;
+  chat.practice = addToPractice(chat.practice, id);
+  // Отвечаем сразу (как handleTap): состояние сохранит цикл опроса после пакета — не держим спиннер
+  // в заложниках у записи на диск.
+  await answerCallback(token, callbackId, before === chat.practice.length ? 'Уже в тренировке' : 'Добавил в тренировку ➕');
+}
+
 /**
  * Нажатие на кнопку. `answerCallbackQuery` вызывается РОВНО ОДИН РАЗ на каждом пути, включая
  * отказы: Telegram принимает только первый ответ на `callback_query_id`, а без ответа вовсе
@@ -128,17 +190,30 @@ async function handleTap(
   const session = chat?.session;
   // Нажатие по прежнему экрану отсекается здесь по msgId: продвижение заменяет chat.session новым
   // сообщением, поэтому старое перестаёт быть живым. Номер урока в тапе — второй рубеж в applyTap.
-  if (!session || !tap || tap.op === 'next' || !isLiveTap(session, messageId)) {
-    // tap.op === 'next' сюда не доходит (маршрутизируется в handleNext до handleTap); проверка
-    // защитная и заодно сужает тип tap до ходов внутри сессии для строк ниже.
+  if (!session || !tap || tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || !isLiveTap(session, messageId)) {
+    // next/add/practice сюда не доходят (маршрутизируются до handleTap); проверка защитная и
+    // заодно сужает тип tap до ходов внутри сессии (answer/word/reset) для строк ниже.
     await answerCallback(token, callbackId, STALE);
     return;
   }
 
-  const exercises = lessonExercises(session.n);
+  const exercises = sessionExercises(session);
+  const answeredIdx = session.i;              // индекс до применения тапа
+  const missedBefore = session.missed.length;
   const result = applyTap(session, exercises, tap);
   await answerCallback(token, callbackId, result.toast);
   if (!result.view) return;
+
+  // Работа над ошибками: словарный промах в УРОКЕ кладёт слово в персональный набор. cardId прямо
+  // из упражнения (label=kg, answer=ru) — без поиска по колоде.
+  if (session.mode === 'lesson' && chat && session.missed.length > missedBefore) {
+    const id = exercises[answeredIdx] ? wordCardId(exercises[answeredIdx]) : null;
+    if (id) chat.practice = addToPractice(chat.practice, id);
+  }
+  // Тренировка доиграна: верные карточки уходят из набора, ошибочные остаются.
+  if (session.mode === 'practice' && chat && isFinished(session, exercises.length)) {
+    chat.practice = graduatePractice(chat.practice, session.cards ?? [], session.missed);
+  }
 
   const edited = await editMessageText(token, chatId, messageId, result.view.text, result.view.keyboard);
   if (edited.kind === 'drop') {
@@ -200,6 +275,8 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
     // Следующий урок сразу, без ограничения на число раз в день (запойное прохождение разрешено).
     await deliverLesson(chatId, advanceTarget(chat));
     console.log(`[bot] /next ${chatId} -> lesson ${chat.cursor}`);
+  } else if (cmd === '/practice') {
+    await startPractice(chatId);
   }
   // Anything else is ignored on purpose: the bot never echoes user input.
 }
@@ -306,10 +383,12 @@ while (!stopping) {
       if (chatId !== undefined && text) await handleCommand(chatId, text);
       const cb = u.callback_query;
       if (cb?.data && cb.message) {
-        // «Дальше ▶» — не ход внутри сессии (нет msgId-привязки к экрану): маршрутизируем отдельно
-        // до handleTap, который отсёк бы его как неживой тап.
+        // next/add/practice — не ходы внутри сессии: маршрутизируем отдельно до handleTap, который
+        // отсёк бы их как неживой тап.
         const tap = parseTap(cb.data);
         if (tap?.op === 'next') await handleNext(cb.message.chat.id, cb.id, tap.n);
+        else if (tap?.op === 'add') await handleAdd(cb.message.chat.id, cb.id, tap.n, tap.i);
+        else if (tap?.op === 'practice') { await answerCallback(token, cb.id, '🎯'); await startPractice(cb.message.chat.id); }
         else await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
       }
       // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом
