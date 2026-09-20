@@ -7,7 +7,9 @@
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { buildLesson, loadDeck } from './daily-task.ts';
-import { buildExercises, buildGrammarExercises, buildPracticeExercises, grammarTrack, GRAMMAR_TRACKS } from './exercise.ts';
+import {
+  buildExercises, buildGrammarExercisesFromPairs, buildPracticeExercises, grammarPairKeys, grammarTrack, GRAMMAR_TRACKS,
+} from './exercise.ts';
 import {
   addChat, chatsDue, isSendTime, loadState, rememberUser, removeChat, saveState, type Session,
 } from './bot-state.ts';
@@ -15,6 +17,8 @@ import { advanceTarget, commitDelivery, lessonSession, shouldAdvanceFromButton }
 import {
   addToPractice, graduatePractice, practiceSeed, selectPractice, wordCardId, PRACTICE_SESSION_SIZE,
 } from './practice.ts';
+import { recordGrammarAnswer, selectGrammarPairs, trackExhausted } from './grammar-progress.ts';
+import { grammarPairs } from '../src/lib/morphology.ts';
 import { broadcast } from './broadcast.ts';
 import {
   answerCallback, editMessageText, getUpdates, isMessageGone, sendMessage, setMyCommands, type SendOutcome,
@@ -131,10 +135,7 @@ async function deliverLesson(chatId: number, n: number): Promise<Exclude<SendOut
 /** Упражнения текущей сессии по её режиму: урок — из номера, тренировка — из замороженного снимка. */
 function sessionExercises(session: Session): ReturnType<typeof buildExercises> {
   if (session.mode === 'practice') return buildPracticeExercises(deck, session.cards ?? [], session.seed ?? 0);
-  if (session.mode === 'grammar') {
-    const track = grammarTrack(session.track ?? -1);
-    return track ? buildGrammarExercises(track.tasks, session.seed ?? 0) : [];
-  }
+  if (session.mode === 'grammar') return buildGrammarExercisesFromPairs(session.pairs ?? [], session.seed ?? 0);
   return lessonExercises(session.n);
 }
 
@@ -201,21 +202,45 @@ async function startGrammar(chatId: number, idx: number): Promise<void> {
   const chat = state.chats[String(chatId)];
   const track = grammarTrack(idx);
   if (!chat || !track) { await sendMessage(token, chatId, 'Нет такой программы. Открой список — /grammar.'); return; }
-  // Свежий сид на каждый старт (в т.ч. «Ещё») ради разнообразия; замораживается на сессии ниже,
+  const seen = chat.grammarSeen ?? {};
+  const allPairs = grammarPairs(track.tasks);
+  // Пройденное исключаем: если непройденных пар нет — тема пройдена, предлагаем сброс, без сессии.
+  if (trackExhausted(allPairs, seen)) {
+    await sendMessage(token, chatId, `Тема «${track.title}» пройдена 🎉`,
+      [[{ text: 'Начать заново', callback_data: `greset:${idx}` }]]);
+    return;
+  }
+  // Свежий сид на каждый старт (в т.ч. «Ещё») ради разнообразия; замораживается на сессии (pairs+seed),
   // поэтому пересбор на нажатиях и после рестарта стабилен. Date.now() — рантайм bot.ts (не тест).
   const seed = (Date.now() ^ ((idx + 1) * 2654435761)) >>> 0;
-  const exercises = buildGrammarExercises(track.tasks, seed);
+  const pairs = selectGrammarPairs(allPairs, seen, seed, 8);
+  const exercises = buildGrammarExercisesFromPairs(pairs, seed);
   if (exercises.length === 0) { await sendMessage(token, chatId, 'В этой программе пока нет упражнений.'); return; }
-  const fresh: Session = { n: GRAMMAR_N, mode: 'grammar', track: idx, seed, i: 0, missed: [], msgId: 0, picked: [] };
+  const fresh: Session = { n: GRAMMAR_N, mode: 'grammar', track: idx, seed, pairs, i: 0, missed: [], msgId: 0, picked: [] };
   const view = render(fresh, exercises);
   const outcome = await sendMessage(token, chatId, view.text, view.keyboard);
   if (outcome.kind === 'ok') { fresh.msgId = outcome.messageId; chat.session = fresh; await saveState(STATE_FILE, state); }
-  console.log(`[bot] /grammar ${chatId} -> track ${idx} (${track.title})`);
+  console.log(`[bot] /grammar ${chatId} -> track ${idx} (${track.title}), ${exercises.length} pair(s)`);
 }
 
 /** «Выбор трека» с меню/итога. Отвечаем ровно один раз, затем стартуем трек. */
 async function handleGrammar(chatId: number, callbackId: string, idx: number): Promise<void> {
   await answerCallback(token, callbackId, grammarTrack(idx) ? '📚' : STALE);
+  await startGrammar(chatId, idx);
+}
+
+/** «Начать заново»: сбросить прогресс ТОЛЬКО этого трека (по его темам) и начать сначала. */
+async function handleGrammarReset(chatId: number, callbackId: string, idx: number): Promise<void> {
+  const chat = state.chats[String(chatId)];
+  const track = grammarTrack(idx);
+  await answerCallback(token, callbackId, chat && track ? 'Сброшено' : STALE);
+  if (!chat || !track) return;
+  if (chat.grammarSeen) {
+    for (const k of Object.keys(chat.grammarSeen)) {
+      if (track.tasks.includes(k.slice(0, k.indexOf('|')))) delete chat.grammarSeen[k];
+    }
+    await saveState(STATE_FILE, state);
+  }
   await startGrammar(chatId, idx);
 }
 
@@ -235,9 +260,9 @@ async function handleTap(
   const session = chat?.session;
   // Нажатие по прежнему экрану отсекается здесь по msgId: продвижение заменяет chat.session новым
   // сообщением, поэтому старое перестаёт быть живым. Номер урока в тапе — второй рубеж в applyTap.
-  if (!session || !tap || tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || tap.op === 'grammar' || !isLiveTap(session, messageId)) {
-    // next/add/practice/grammar сюда не доходят (маршрутизируются до handleTap); проверка защитная
-    // и заодно сужает тип tap до ходов внутри сессии (answer/word/reset) для строк ниже.
+  if (!session || !tap || tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || tap.op === 'grammar' || tap.op === 'greset' || !isLiveTap(session, messageId)) {
+    // next/add/practice/grammar/greset сюда не доходят (маршрутизируются до handleTap); проверка
+    // защитная и заодно сужает тип tap до ходов внутри сессии (answer/word/reset) для строк ниже.
     await answerCallback(token, callbackId, STALE);
     return;
   }
@@ -258,6 +283,13 @@ async function handleTap(
   // Тренировка доиграна: верные карточки уходят из набора, ошибочные остаются.
   if (session.mode === 'practice' && chat && isFinished(session, exercises.length)) {
     chat.practice = graduatePractice(chat.practice, session.cards ?? [], session.missed);
+  }
+  // Грамматика: пофразно копим прогресс. Ключ берём из СПИСКА оставленных ключей (grammarPairKeys),
+  // выровненного с exercises 1:1, а не из session.pairs по индексу — тогда выпавший дрейф-ключ не
+  // сместит запись (plan-review PR-001). Верно = промах не вырос.
+  if (session.mode === 'grammar' && chat) {
+    const key = grammarPairKeys(session.pairs ?? [])[answeredIdx];
+    if (key) chat.grammarSeen = recordGrammarAnswer(chat.grammarSeen ?? {}, key, session.missed.length === missedBefore);
   }
 
   const edited = await editMessageText(token, chatId, messageId, result.view.text, result.view.keyboard);
@@ -445,6 +477,7 @@ while (!stopping) {
         else if (tap?.op === 'add') await handleAdd(cb.message.chat.id, cb.id, tap.n, tap.i);
         else if (tap?.op === 'practice') { await answerCallback(token, cb.id, '🎯'); await startPractice(cb.message.chat.id); }
         else if (tap?.op === 'grammar') await handleGrammar(cb.message.chat.id, cb.id, tap.n);
+        else if (tap?.op === 'greset') await handleGrammarReset(cb.message.chat.id, cb.id, tap.n);
         else await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
       }
       // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом

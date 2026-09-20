@@ -32,6 +32,9 @@ export interface Session {
   seed?: number;
   /** Грамматика: индекс трека в GRAMMAR_TRACKS (заголовок + кнопка «🔁 Ещё»). */
   track?: number;
+  /** Грамматика: замороженные ключи "task|word" этой сессии. Как cards у тренировки — чтобы
+   *  освоение пары посреди сессии не сдвигало упражнения под курсором. */
+  pairs?: string[];
   /** Номер текущего упражнения; он же — число уже отвеченных. */
   i: number;
   /**
@@ -56,6 +59,8 @@ export interface ChatState {
   practice: string[];
   /** Кто это (from). Метаданные для логов/наглядности; на ключевание прогресса не влияет. */
   user?: UserIdentity;
+  /** Прогресс грамматики: "task|word" → число верных ответов (0..MASTERY). Пройдено = >= MASTERY. */
+  grammarSeen?: Record<string, number>;
   session: Session | null;
 }
 
@@ -110,6 +115,7 @@ function chatFrom(raw: unknown): ChatState {
             : {}),
           ...(Number.isFinite(s.seed) ? { seed: num(s.seed) } : {}),
           ...(Number.isFinite(s.track) ? { track: num(s.track) } : {}),
+          ...(Array.isArray(s.pairs) ? { pairs: s.pairs.filter((p): p is string => typeof p === 'string') } : {}),
           i: num(s.i),
           missed: Array.isArray(s.missed) ? s.missed.filter((m) => typeof m === 'string') : [],
           msgId: num(s.msgId),
@@ -117,13 +123,25 @@ function chatFrom(raw: unknown): ChatState {
         }
       : null;
   const user = parseUser(r.user); // отсутствует у старых записей → undefined
+  const grammarSeen = seenFrom(r.grammarSeen); // отсутствует у старых записей → undefined
   return {
     sentDay: typeof r.sentDay === 'string' ? r.sentDay : null,
     cursor: num(r.cursor), // отсутствует у старых записей → 0
     practice: Array.isArray(r.practice) ? r.practice.filter((c): c is string => typeof c === 'string') : [],
     ...(user ? { user } : {}),
+    ...(grammarSeen ? { grammarSeen } : {}),
     session,
   };
+}
+
+/** Прогресс грамматики из недоверенного JSON: только конечные числа; пустое → undefined. */
+function seenFrom(raw: unknown): Record<string, number> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (Number.isFinite(v)) out[k] = Number(v);
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**

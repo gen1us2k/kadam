@@ -2,7 +2,7 @@
 // Модуль чистый — ни сети, ни состояния: порядок вариантов выводится из сида дня, поэтому
 // упражнения пересобираются одинаково при каждом нажатии и переживают рестарт без хранения.
 
-import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
+import { buildDrills, drillOptions, makeDrill } from '../src/lib/morphology.ts';
 import { makeBank, rng, shuffle, type Chip } from '../src/lib/study-utils.ts';
 import { cardId, type VocabRow } from '../src/lib/vocab-parse.ts';
 import type { DailyTask } from './daily-task.ts';
@@ -139,6 +139,40 @@ export function buildGrammarExercises(tasks: string[], seed: number, count = GRA
     answer: drill.answer,
     label: `${drill.word} → ${drill.task}`,
   }));
+}
+
+/** Разбор ключа "task|word". */
+function splitPairKey(key: string): { task: string; word: string } {
+  const bar = key.indexOf('|');
+  return { task: key.slice(0, bar), word: key.slice(bar + 1) };
+}
+
+/**
+ * Ключи "task|word", которые реально дают дрилл (makeDrill != null), в исходном порядке. Единый
+ * фильтр для buildGrammarExercisesFromPairs И для оценки в bot.ts: упражнение i соответствует
+ * ключу grammarPairKeys(...)[i] даже если какой-то ключ выпал (дрейф темы), поэтому индекс ответа
+ * не съезжает. (plan-review PR-001.)
+ */
+export function grammarPairKeys(pairs: string[]): string[] {
+  return pairs.filter((key) => {
+    const { task, word } = splitPairKey(key);
+    return makeDrill(task, word) !== null;
+  });
+}
+
+/** Упражнения грамматики из замороженных ключей "task|word". Порядок совпадает с grammarPairKeys. */
+export function buildGrammarExercisesFromPairs(pairs: string[], seed: number): Exercise[] {
+  return grammarPairKeys(pairs).map((key, i) => {
+    const { task, word } = splitPairKey(key);
+    const drill = makeDrill(task, word)!; // grammarPairKeys уже отфильтровал неразрешимые
+    return {
+      kind: 'drill' as const,
+      prompt: `${drill.word} → ${drill.task}`,
+      options: drillOptions(drill, exerciseSeed(seed, i)),
+      answer: drill.answer,
+      label: `${drill.word} → ${drill.task}`,
+    };
+  });
 }
 
 /** Верна ли сборка предложения. Сравнение по тексту, поэтому повтор слова не даёт ложной ошибки. */

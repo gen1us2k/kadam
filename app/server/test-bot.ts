@@ -16,13 +16,15 @@ import {
   advanceTarget, advancedToday, commitCursor, commitDelivery, lessonSession, shouldAdvanceFromButton,
 } from './progression.ts';
 import {
-  buildExercises, buildGrammarExercises, buildPracticeExercises, checkAssembled, grammarTrack,
-  GRAMMAR_TRACKS, type AssembleExercise, type ChoiceExercise,
+  buildExercises, buildGrammarExercises, buildGrammarExercisesFromPairs, buildPracticeExercises,
+  checkAssembled, grammarPairKeys, grammarTrack, GRAMMAR_TRACKS,
+  type AssembleExercise, type ChoiceExercise,
 } from './exercise.ts';
 import { addToPractice, graduatePractice, practiceSeed, selectPractice, wordCardId, PRACTICE_CAP } from './practice.ts';
 import { BOT_COMMANDS, commandsHelp } from './commands.ts';
+import { MASTERY, grammarKey, isMastered, recordGrammarAnswer, selectGrammarPairs, trackExhausted } from './grammar-progress.ts';
 import { applyTap, isFinished, isLiveTap, parseTap, render, STALE, summary } from './session.ts';
-import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
+import { buildDrills, drillOptions, grammarPairs, makeDrill } from '../src/lib/morphology.ts';
 import { makeBank } from '../src/lib/study-utils.ts';
 import { broadcast } from './broadcast.ts';
 import {
@@ -720,6 +722,58 @@ await saveState(uFile, { offset: 0, chats: {
 const uBack = await loadState(uFile);
 check('round-trip keeps user identity', uBack.chats['1'].user?.id === 1 && uBack.chats['1'].user?.username === 'zed' && uBack.chats['1'].user?.firstName === 'Зед', uBack.chats['1'].user);
 check('a chat without user loads with user absent', uBack.chats['2'].user === undefined && uBack.chats['2'].cursor === 0);
+
+// --- grammar progress (grammar-progress.ts + morphology + exercise) ---
+const GKEY = grammarKey('Родительный (илик)', 'китеп');
+check('grammarKey joins task and word', GKEY === 'Родительный (илик)|китеп');
+check('recordGrammarAnswer increments and caps at MASTERY', (() => {
+  let s: Record<string, number> = {};
+  for (let n = 0; n < MASTERY + 3; n++) s = recordGrammarAnswer(s, GKEY, true);
+  return s[GKEY] === MASTERY;
+})());
+check('recordGrammarAnswer resets to 0 on a wrong answer', recordGrammarAnswer({ [GKEY]: 1 }, GKEY, false)[GKEY] === 0);
+check('recordGrammarAnswer does not mutate its input', (() => { const s = { [GKEY]: 0 }; recordGrammarAnswer(s, GKEY, true); return s[GKEY] === 0; })());
+check('isMastered false below / true at MASTERY', !isMastered({ [GKEY]: MASTERY - 1 }, GKEY) && isMastered({ [GKEY]: MASTERY }, GKEY));
+// selectGrammarPairs excludes mastered, caps, deterministic
+const pairsPool = grammarPairs(['Родительный (илик)']);
+check('grammarPairs enumerates task×words', pairsPool.length > 0 && pairsPool.every((p) => p.task === 'Родительный (илик)'), pairsPool.length);
+const someSeen: Record<string, number> = { [grammarKey(pairsPool[0].task, pairsPool[0].word)]: MASTERY };
+const sel = selectGrammarPairs(pairsPool, someSeen, 123, 5);
+check('selectGrammarPairs excludes mastered + caps', sel.length <= 5 && !sel.includes(grammarKey(pairsPool[0].task, pairsPool[0].word)), sel);
+check('selectGrammarPairs is deterministic for a seed', selectGrammarPairs(pairsPool, someSeen, 123, 5).join() === sel.join());
+// trackExhausted
+const allSeen: Record<string, number> = {};
+for (const p of pairsPool) allSeen[grammarKey(p.task, p.word)] = MASTERY;
+check('trackExhausted true when all mastered', trackExhausted(pairsPool, allSeen) === true);
+check('trackExhausted false with a fresh pair', trackExhausted(pairsPool, {}) === false);
+check('selectGrammarPairs empty when all mastered', selectGrammarPairs(pairsPool, allSeen, 1, 8).length === 0);
+
+// makeDrill + buildGrammarExercisesFromPairs + PR-001 alignment
+check('makeDrill builds the confirmed form', makeDrill('Родительный (илик)', 'китеп')?.answer === 'китептин');
+check('makeDrill returns null for an unknown task', makeDrill('nope', 'x') === null);
+const goodK1 = grammarKey('Родительный (илик)', 'китеп');
+const goodK2 = grammarKey('Винительный (табыш)', 'кыз');
+check('grammarPairKeys keeps resolvable keys in order, drops bad ones', grammarPairKeys([goodK1, 'nope|x', goodK2]).join() === `${goodK1},${goodK2}`);
+const gex2 = buildGrammarExercisesFromPairs([goodK1, 'nope|x', goodK2], 55);
+check('buildGrammarExercisesFromPairs drops bad key and stays aligned', gex2.length === 2 && gex2[0].answer === 'китептин' && gex2[1].answer === 'кызды', gex2.map((e) => e.answer));
+
+// parseTap greset
+const gresetTap = parseTap('greset:1');
+check('parseTap greset carries the track index', gresetTap?.op === 'greset' && gresetTap.n === 1, gresetTap); // op is 'greset'
+check('parseTap greset without index rejected', parseTap('greset:') === null);
+check('greset callback_data under 64 bytes', Buffer.byteLength('greset:4') < 64);
+
+// migration: grammarSeen + grammar session pairs round-trip; absent → undefined
+const gpFile = join(dir, 'grammar-progress.json');
+await saveState(gpFile, { offset: 0, chats: {
+  '1': { sentDay: null, cursor: 0, practice: [], grammarSeen: { [goodK1]: 2, bad: NaN as unknown as number },
+    session: { n: 2_000_000_000, mode: 'grammar', track: 1, seed: 9, pairs: [goodK1, goodK2], i: 0, missed: [], msgId: 4, picked: [] } },
+  '2': { sentDay: null, cursor: 0, practice: [], session: null },
+} });
+const gpBack = await loadState(gpFile);
+check('round-trip keeps grammarSeen (finite only)', gpBack.chats['1'].grammarSeen?.[goodK1] === 2 && gpBack.chats['1'].grammarSeen?.bad === undefined, gpBack.chats['1'].grammarSeen);
+check('round-trip keeps a grammar session pairs', gpBack.chats['1'].session?.pairs?.join() === `${goodK1},${goodK2}`, gpBack.chats['1'].session?.pairs);
+check('a chat without grammarSeen loads undefined', gpBack.chats['2'].grammarSeen === undefined);
 
 await rm(dir, { recursive: true, force: true });
 done('BOT OK');

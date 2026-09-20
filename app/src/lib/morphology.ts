@@ -194,6 +194,22 @@ const DRILL_TYPES: DrillType[] = [
 //  • вопросительная -бы — цепляется к сказуемому и требует буферной гласной у согласных основ;
 //  • сингармонизм — правило под КАЖДЫМ суффиксом, уже проверяется дистракторами по оси гармонии.
 
+/** Все пары (тема, слово) для заданных тем — полный пул для исключения пройденного в грамматике. */
+export function grammarPairs(tasks: string[]): { task: string; word: string }[] {
+  const out: { task: string; word: string }[] = [];
+  for (const t of DRILL_TYPES) {
+    if (!tasks.includes(t.task)) continue;
+    for (const word of t.words) out.push({ task: t.task, word });
+  }
+  return out;
+}
+
+/** Один дрилл для конкретной пары (тема, слово); null — темы нет. Обёртка над приватным inflect. */
+export function makeDrill(task: string, word: string): Drill | null {
+  const t = DRILL_TYPES.find((x) => x.task === task);
+  return t ? { task: t.task, word, answer: inflect(t.suffix, word), hint: t.hint } : null;
+}
+
 /**
  * Deterministic pseudo-random drill set for a given seed (e.g. day number).
  * Optional `tasks` restricts drill types (e.g. only plural for early journey steps).

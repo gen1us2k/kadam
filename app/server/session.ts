@@ -13,7 +13,8 @@ export type Tap =
   | { op: 'next'; n: number }
   | { op: 'add'; n: number; i: number }   // «➕ в тренировку» — обрабатывается в bot.ts
   | { op: 'practice' }                     // «🎯 Тренировка» / старт тренировки — в bot.ts
-  | { op: 'grammar'; n: number };          // старт грамматического трека (n = индекс трека) — в bot.ts
+  | { op: 'grammar'; n: number }           // старт грамматического трека (n = индекс трека) — в bot.ts
+  | { op: 'greset'; n: number };           // «Начать заново» для трека n (сброс прогресса) — в bot.ts
 
 /**
  * Разбор callback_data. Значение приходит от клиента, а не от нас, поэтому ничему в нём верить
@@ -28,6 +29,7 @@ export function parseTap(data: string): Tap | null {
   if (!digits.test(rawN ?? '')) return null;
   const n = Number(rawN);
   if (op === 'gram') return { op: 'grammar', n }; // n здесь — индекс трека
+  if (op === 'greset') return { op: 'greset', n }; // n здесь — индекс трека
   if (op === 'next') return { op: 'next', n };
   if (!digits.test(rawI ?? '')) return null;
   const i = Number(rawI);
@@ -171,7 +173,7 @@ export const STALE = 'Это уже неактуально — откройте 
 export function applyTap(session: Session, exercises: Exercise[], tap: Tap): TapResult {
   // next/add/practice — не ходы внутри сессии; их маршрутизирует bot.ts до applyTap. Защитно гасим
   // и заодно сужаем тип tap до answer/word/reset (у которых есть n/i) для строк ниже.
-  if (tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || tap.op === 'grammar') return { view: null, toast: STALE };
+  if (tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || tap.op === 'grammar' || tap.op === 'greset') return { view: null, toast: STALE };
   const ex = exercises[session.i];
   // `!ex` покрывает и доигранную сессию: за последним упражнением элемента нет.
   if (tap.n !== session.n || tap.i !== session.i || !ex) return { view: null, toast: STALE };
