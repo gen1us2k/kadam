@@ -335,6 +335,22 @@ const FORMS: [string, string, string][] = [
   ['Будущее (-ат)', 'бар', 'барат'],
   ['Отрицание (-байт)', 'кел', 'келбейт'],
   ['Отрицание (-байт)', 'айт', 'айтпайт'],
+  // Новые формы (шаги 4/7/8) — сверены с курсом; вкл. основу на гласную и глухую согласную.
+  ['Родительный (илик)', 'китеп', 'китептин'],
+  ['Родительный (илик)', 'кыз', 'кыздын'],
+  ['Родительный (илик)', 'тоо', 'тоонун'],
+  ['Винительный (табыш)', 'кыз', 'кызды'],
+  ['Винительный (табыш)', 'тоо', 'тоону'],
+  ['Винительный (табыш)', 'китеп', 'китепти'],
+  ['Причастие -ган', 'бар', 'барган'],
+  ['Причастие -ган', 'кет', 'кеткен'],
+  ['Причастие -ган', 'ич', 'ичкен'],
+  ['Деепричастие -ып', 'бар', 'барып'],
+  ['Деепричастие -ып', 'ал', 'алып'],
+  ['Деепричастие -ып', 'ич', 'ичип'],
+  ['Запрет -ба', 'бар', 'барба'],
+  ['Запрет -ба', 'кет', 'кетпе'],
+  ['Запрет -ба', 'жаз', 'жазба'],
 ];
 const findDrill = (task: string, word: string) => {
   for (let sd = 1; sd <= 400; sd++) {
@@ -359,8 +375,9 @@ check('distractors keep the stem', opts.every((o) => o.startsWith(drill.word)), 
 // Одной проверки «четыре различных» НЕДОСТАТОЧНО: её проходил и прежний согласно-мажорный
 // перебор, из-за которого половина типов не проверяла гармонию вовсе.
 const CONSONANTAL = ['Множественное число', 'Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)',
-  'Прошедшее (-ды)', 'Отрицание (-байт)'];
-const VOWEL_ONLY = ['Настоящее (-ып жатат)', 'Будущее (-ат)'];
+  'Прошедшее (-ды)', 'Отрицание (-байт)',
+  'Родительный (илик)', 'Винительный (табыш)', 'Причастие -ган', 'Запрет -ба'];
+const VOWEL_ONLY = ['Настоящее (-ып жатат)', 'Будущее (-ат)', 'Деепричастие -ып'];
 let thin = 0;
 let wrongAxis = 0;
 // Подпись типа здесь — ключ: переименуй её в morphology.ts, и buildDrills вернёт пустой список,
@@ -382,9 +399,22 @@ for (const t of [...CONSONANTAL, ...VOWEL_ONLY]) {
     }
   }
 }
-check('the sweep actually reached all eight drill types', Object.values(swept).length === 8 && Object.values(swept).every((n) => n > 0), swept);
+check('the sweep actually reached all thirteen drill types', Object.values(swept).length === 13 && Object.values(swept).every((n) => n > 0), swept);
 check('every drill type yields four distinct options', thin === 0, thin);
 check('one assimilation error where the suffix has a consonant, three harmony errors where it has none', wrongAxis === 0, wrongAxis);
+// Деепричастие -ып без согласной корректно только для основ на согласную (иначе оку → окууп).
+// Пул DRILL_VERBS согласно-финальный — сторожим это через сами дриллы, не завися от экспорта пула.
+const KG_VOWELS = 'аеёиоуыэюяөү';
+let vowelStemVerb = 0;
+let converbSeen = 0;
+for (let sd = 1; sd <= 40; sd++) {
+  for (const d of buildDrills(20, sd, ['Деепричастие -ып'])) {
+    converbSeen++;
+    if (KG_VOWELS.includes(d.word[d.word.length - 1])) vowelStemVerb++;
+  }
+}
+// converbSeen>0 — иначе (переименовали метку) страж прошёл бы вхолостую.
+check('converb pool stays consonant-final (guards -ып correctness)', converbSeen > 0 && vowelStemVerb === 0, { converbSeen, vowelStemVerb });
 
 // --- makeBank: перенос не изменил банк ---
 check('bank keeps every word', makeBank(['а', 'б', 'в'], 7).map((c) => c.w).sort().join() === 'а,б,в');

@@ -3,7 +3,9 @@
 // step-03/04 noun cases, step-02/04/05 verb tenses), so drills always agree with the
 // taught material. Verb forms here are 3rd-person singular of regular consonant-final
 // stems (the curated DRILL_VERBS); irregular verbs are excluded.
-// ⚠️ Verb forms are model-authored — worth a native-speaker spot-check.
+// ⚠️ Verb forms AND the later-added noun-case / non-finite forms (genitive -нын, accusative -ны,
+//    participle -ган, converb -ып, prohibitive -ба) are model-authored over the curated regular
+//    stems and grounded in the course steps — worth a native-speaker spot-check before relying on them.
 
 import { rng, shuffle } from './study-utils.ts';
 
@@ -102,6 +104,24 @@ const AORIST: Suffix = { ...NO_CONS, harmony: 'low', tail: 'т' };
 /** Отрицание аориста: -байт/-пайт. бар → барбайт, кет → кетпейт. */
 const NEG_AORIST: Suffix = { ...voicedPair('б', 'п'), harmony: 'low', tail: 'йт' };
 
+// --- Падежи 2 (илик/табыш) и неличные глагольные формы. Формы сверены с шагами 4/7/8. ---
+
+/** Падежи илик/табыш: согласная -н после гласной, -т после глухой, иначе -д. */
+const CASE_CONS = {
+  cons: (w: string) => (endsVowel(w) ? 'н' : endsVoiceless(w) ? 'т' : 'д'),
+  consVariants: ['н', 'д', 'т'] as const,
+};
+/** Родительный (илик): -нын/-дын/-тын. китеп → китептин, тоо → тоонун. */
+const GENITIVE: Suffix = { ...CASE_CONS, harmony: 'high', tail: 'н' };
+/** Винительный (табыш): -ны/-ды/-ты. кыз → кызды, тоо → тоону. */
+const ACCUSATIVE: Suffix = { ...CASE_CONS, harmony: 'high', tail: '' };
+/** Причастие/перфект -ган: -ган/-ген/-гон/-гөн, после глухой -кан. бар → барган, кет → кеткен. */
+const PARTICIPLE_GAN: Suffix = { ...voicedPair('г', 'к'), harmony: 'low', tail: 'н' };
+/** Деепричастие -ып: -ып/-ип/-уп/-үп. бар → барып, ал → алып. Пул глаголов — только на согласную. */
+const CONVERB_YP: Suffix = { ...NO_CONS, harmony: 'high', tail: 'п' };
+/** Запрет (прохибитив) -ба: -ба/-бе/-бо/-бө, после глухой -па. бар → барба, кет → кетпе. */
+const PROHIBITIVE_BA: Suffix = { ...voicedPair('б', 'п'), harmony: 'low', tail: '' };
+
 /** Верная форма: согласная и гласная выбраны по гармонии и ассимиляции. */
 const inflect = (s: Suffix, word: string): string =>
   `${word}${s.cons(word)}${HARMONY[s.harmony].pick(word)}${s.tail}`;
@@ -162,7 +182,17 @@ const DRILL_TYPES: DrillType[] = [
   { task: 'Прошедшее (-ды)', hint: 'кел → келди', suffix: PAST, words: DRILL_VERBS },
   { task: 'Будущее (-ат)', hint: 'бар → барат', suffix: AORIST, words: DRILL_VERBS },
   { task: 'Отрицание (-байт)', hint: 'кел → келбейт', suffix: NEG_AORIST, words: DRILL_VERBS },
+  { task: 'Родительный (илик)', hint: 'үй → үйдүн', suffix: GENITIVE, words: DRILL_NOUNS },
+  { task: 'Винительный (табыш)', hint: 'китеп → китепти', suffix: ACCUSATIVE, words: DRILL_NOUNS },
+  { task: 'Причастие -ган', hint: 'бар → барган', suffix: PARTICIPLE_GAN, words: DRILL_VERBS },
+  { task: 'Деепричастие -ып', hint: 'бар → барып', suffix: CONVERB_YP, words: DRILL_VERBS },
+  { task: 'Запрет -ба', hint: 'бар → барба', suffix: PROHIBITIVE_BA, words: DRILL_VERBS },
 ];
+
+// НЕ добавлены сюда сознательно (не ложатся на модель одного суффикса):
+//  • притяжательные аффиксы — парадигма из 7 лиц + озвончение основы (китеп → китебим);
+//  • вопросительная -бы — цепляется к сказуемому и требует буферной гласной у согласных основ;
+//  • сингармонизм — правило под КАЖДЫМ суффиксом, уже проверяется дистракторами по оси гармонии.
 
 /**
  * Deterministic pseudo-random drill set for a given seed (e.g. day number).
