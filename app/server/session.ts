@@ -5,33 +5,37 @@ import { checkAssembled, type Exercise } from './exercise.ts';
 import type { Session } from './bot-state.ts';
 import { escapeHtml, type Keyboard } from './telegram.ts';
 
-/** Действия, которые может прислать кнопка. */
+/** Действия, которые может прислать кнопка. `next` — «Дальше ▶», обрабатывается в bot.ts. */
 export type Tap =
-  | { op: 'answer'; day: string; i: number; arg: number }
-  | { op: 'word'; day: string; i: number; arg: number }
-  | { op: 'reset'; day: string; i: number };
+  | { op: 'answer'; n: number; i: number; arg: number }
+  | { op: 'word'; n: number; i: number; arg: number }
+  | { op: 'reset'; n: number; i: number }
+  | { op: 'next'; n: number };
 
 /**
  * Разбор callback_data. Значение приходит от клиента, а не от нас, поэтому ничему в нём верить
  * нельзя: неизвестная операция, нечисловые поля и мусор дают null, а границы индексов проверяет
- * уже applyTap по длине упражнений и банка.
+ * уже applyTap по длине упражнений и банка. Идентичность теперь несёт номер урока n, не день.
  */
 export function parseTap(data: string): Tap | null {
-  const [op, day, rawI, rawArg] = data.split(':');
+  const [op, rawN, rawI, rawArg] = data.split(':');
   // Только цифры: Number('') === 0, и пустое поле иначе разобралось бы как индекс 0.
   const digits = /^\d+$/;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day ?? '') || !digits.test(rawI ?? '')) return null;
+  if (!digits.test(rawN ?? '')) return null;
+  const n = Number(rawN);
+  if (op === 'next') return { op: 'next', n };
+  if (!digits.test(rawI ?? '')) return null;
   const i = Number(rawI);
-  if (op === 'reset') return { op: 'reset', day, i };
+  if (op === 'reset') return { op: 'reset', n, i };
   if (!digits.test(rawArg ?? '')) return null;
   const arg = Number(rawArg);
-  if (op === 'a') return { op: 'answer', day, i, arg };
-  if (op === 'w') return { op: 'word', day, i, arg };
+  if (op === 'a') return { op: 'answer', n, i, arg };
+  if (op === 'w') return { op: 'word', n, i, arg };
   return null;
 }
 
-const encode = (op: string, day: string, i: number, arg?: number) =>
-  arg === undefined ? `${op}:${day}:${i}` : `${op}:${day}:${i}:${arg}`;
+const encode = (op: string, n: number, i?: number, arg?: number) =>
+  i === undefined ? `${op}:${n}` : arg === undefined ? `${op}:${n}:${i}` : `${op}:${n}:${i}:${arg}`;
 
 export interface View {
   text: string;
@@ -47,7 +51,7 @@ function rows<T>(items: T[], width: number): T[][] {
 
 /** Заголовок с прогрессом плюс необязательная строка отклика на прошлый ответ. */
 function header(session: Session, total: number, feedback?: string): string {
-  const progress = `🇰🇬 <b>Задание на ${escapeHtml(session.day)}</b> · ${session.i + 1}/${total}`;
+  const progress = `🇰🇬 <b>Урок ${session.n + 1}</b> · ${session.i + 1}/${total}`;
   return feedback ? `${progress}\n${feedback}\n` : `${progress}\n`;
 }
 
@@ -64,11 +68,11 @@ export function render(session: Session, exercises: Exercise[], feedback?: strin
     const built = session.picked.map(byId).join(' ');
     const text = `${head}\n📝 ${e(ex.prompt)}\n\n<b>${e(built) || '…'}</b>${'  _'.repeat(left.length)}`;
     const keyboard = rows(
-      left.map((c) => ({ text: c.w, callback_data: encode('w', session.day, session.i, c.id) })),
+      left.map((c) => ({ text: c.w, callback_data: encode('w', session.n, session.i, c.id) })),
       3,
     );
     if (session.picked.length > 0) {
-      keyboard.push([{ text: '↺ сброс', callback_data: encode('reset', session.day, session.i) }]);
+      keyboard.push([{ text: '↺ сброс', callback_data: encode('reset', session.n, session.i) }]);
     }
     return { text, keyboard };
   }
@@ -77,7 +81,7 @@ export function render(session: Session, exercises: Exercise[], feedback?: strin
   return {
     text: `${head}\n${icon} ${e(ex.prompt)}`,
     keyboard: rows(
-      ex.options.map((opt, k) => ({ text: opt, callback_data: encode('a', session.day, session.i, k) })),
+      ex.options.map((opt, k) => ({ text: opt, callback_data: encode('a', session.n, session.i, k) })),
       2,
     ),
   };
@@ -86,7 +90,7 @@ export function render(session: Session, exercises: Exercise[], feedback?: strin
 /** Итоговый экран: счёт и разбор того, что не получилось. */
 export function summary(session: Session, total: number, feedback?: string): View {
   const lines = [
-    `🇰🇬 <b>Задание на ${escapeHtml(session.day)}</b> — готово`,
+    `🇰🇬 <b>Урок ${session.n + 1}</b> — готово`,
     // Отклик на последний ответ: без него шестнадцатое упражнение осталось бы без ✅/❌.
     ...(feedback ? [feedback] : []),
     // Верных — всё отвеченное минус промахи; отдельного счётчика нет намеренно (см. Session).
@@ -95,8 +99,10 @@ export function summary(session: Session, total: number, feedback?: string): Vie
   if (session.missed.length > 0) {
     lines.push('', 'Не получилось:', ...session.missed.map((m) => `• ${escapeHtml(m)}`));
   }
-  lines.push('', 'Завтра пришлю новое. Повторить сегодняшнее — /task');
-  return { text: lines.join('\n'), keyboard: [] };
+  lines.push('', 'Дальше — кнопкой ниже или /next. Повторить этот урок — /task.');
+  // «Дальше ▶» несёт текущий номер урока: bot.ts двигает курсор, только если он всё ещё n
+  // (защита от повторного/устаревшего нажатия по старому итогу).
+  return { text: lines.join('\n'), keyboard: [[{ text: 'Дальше ▶', callback_data: encode('next', session.n) }]] };
 }
 
 /**
@@ -107,15 +113,12 @@ export function summary(session: Session, total: number, feedback?: string): Vie
 export const isFinished = (session: Session, total: number): boolean => session.i >= total;
 
 /**
- * Относится ли нажатие к живой сессии: то самое сообщение и тот самый день.
- *
- * Вынесено сюда, а не оставлено условием внутри `bot.ts`, именно потому что это самая
- * ответственная строка изменения: без проверки дня брошенная вчерашняя сессия принимала бы тап
- * и зачитывала ответ против сегодняшнего упражнения при вчерашнем вопросе на экране.
- * В точке входа такую строку нечем покрыть, здесь — можно.
+ * Относится ли нажатие к живой сессии: то самое сообщение. День больше ни при чём — единица
+ * работы теперь урок, а продвижение (/next, «Дальше ▶», дневной пуш) заменяет chat.session новым
+ * сообщением, поэтому нажатие по прежнему экрану гасится по msgId. Номер урока в самом тапе —
+ * второй рубеж (см. applyTap): тап с чужим n не пройдёт, даже если msgId совпал.
  */
-export const isLiveTap = (session: Session, messageId: number, today: string): boolean =>
-  session.msgId === messageId && session.day === today;
+export const isLiveTap = (session: Session, messageId: number): boolean => session.msgId === messageId;
 
 export interface TapResult {
   /** Что показать после нажатия; null — состояние не изменилось, показывать нечего. */
@@ -133,9 +136,11 @@ export const STALE = 'Это уже неактуально — откройте 
  * упражнению и подделанные клиентом строки.
  */
 export function applyTap(session: Session, exercises: Exercise[], tap: Tap): TapResult {
+  // «Дальше ▶» — не ход внутри сессии; его маршрутизирует bot.ts до applyTap. Защитно гасим.
+  if (tap.op === 'next') return { view: null, toast: STALE };
   const ex = exercises[session.i];
   // `!ex` покрывает и доигранную сессию: за последним упражнением элемента нет.
-  if (tap.day !== session.day || tap.i !== session.i || !ex) return { view: null, toast: STALE };
+  if (tap.n !== session.n || tap.i !== session.i || !ex) return { view: null, toast: STALE };
 
   if (tap.op === 'reset') {
     if (ex.kind !== 'sentence') return { view: null, toast: 'Здесь нечего сбрасывать' };

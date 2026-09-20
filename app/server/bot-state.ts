@@ -10,11 +10,12 @@ import { dirname } from 'node:path';
 
 export interface Session {
   /**
-   * Какому дню принадлежит сессия; смена суток её отбрасывает. Упражнения пересобираются из сида
-   * дня И колоды, а ключ здесь — только день: допущение в том, что колода заморожена на релиз.
-   * Деплой, меняющий anki/*.csv посреди дня, сдвинет слова под живым курсором (принятый риск).
+   * Номер урока, которому принадлежит сессия. Замена прежнего `day`: единица работы теперь урок,
+   * а не календарный день, поэтому незаконченный урок продолжается и после полуночи. Упражнения
+   * пересобираются из сида урока (lessonSeed(n)) И колоды; допущение — колода заморожена на релиз
+   * (деплой, меняющий anki/*.csv, сдвинет слова под живым курсором — принятый риск).
    */
-  day: string;
+  n: number;
   /** Номер текущего упражнения; он же — число уже отвеченных. */
   i: number;
   /**
@@ -30,8 +31,11 @@ export interface Session {
 }
 
 export interface ChatState {
-  /** День последней отправки этому чату, null — ещё не слали. */
+  /** День последней ОТПРАВКИ этому чату (не урок), null — ещё не слали. Он же маркер «сегодня уже
+   *  двигались»: гасит дневной пуш для тех, кто продвинулся вручную через /next. */
   sentDay: string | null;
+  /** Текущий (последний выданный) номер урока. Новый подписчик — 0. */
+  cursor: number;
   session: Session | null;
 }
 
@@ -53,17 +57,24 @@ const num = (v: unknown): number => (Number.isFinite(v) ? Number(v) : 0);
 function chatFrom(raw: unknown): ChatState {
   const r = (raw ?? {}) as Partial<ChatState>;
   const s = r.session as Partial<Session> | null | undefined;
+  // Сессии, сохранённые ДО перехода на курсор (были с `day`, без `n`), не переносятся: старый
+  // календарный day не отображается на номер урока. Цена — незаконченная на момент деплоя сессия
+  // начнётся заново через /task (осознанный минимальный риск, как и прежний сброс вчерашней сессии).
   const session: Session | null =
-    s && typeof s.day === 'string' && Number.isFinite(s.i)
+    s && Number.isFinite(s.n) && Number.isFinite(s.i)
       ? {
-          day: s.day,
+          n: num(s.n),
           i: num(s.i),
           missed: Array.isArray(s.missed) ? s.missed.filter((m) => typeof m === 'string') : [],
           msgId: num(s.msgId),
           picked: Array.isArray(s.picked) ? s.picked.filter((x) => Number.isFinite(x)) : [],
         }
       : null;
-  return { sentDay: typeof r.sentDay === 'string' ? r.sentDay : null, session };
+  return {
+    sentDay: typeof r.sentDay === 'string' ? r.sentDay : null,
+    cursor: num(r.cursor), // отсутствует у старых записей → 0
+    session,
+  };
 }
 
 /**
@@ -80,7 +91,7 @@ function chatsFrom(parsed: { chats?: unknown; lastSentDay?: unknown }): Record<s
   if (Array.isArray(parsed.chats)) {
     const sentDay = typeof parsed.lastSentDay === 'string' ? parsed.lastSentDay : null;
     for (const id of parsed.chats) {
-      if (Number.isFinite(id)) out[String(id)] = { sentDay, session: null };
+      if (Number.isFinite(id)) out[String(id)] = { sentDay, cursor: 0, session: null };
     }
     return out;
   }
@@ -164,7 +175,7 @@ export function saveState(path: string, state: BotState): Promise<void> {
 export function addChat(state: BotState, chatId: number): boolean {
   const key = String(chatId);
   if (state.chats[key]) return false;
-  state.chats[key] = { sentDay: null, session: null };
+  state.chats[key] = { sentDay: null, cursor: 0, session: null };
   return true;
 }
 

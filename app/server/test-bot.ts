@@ -7,11 +7,14 @@ import { mkdtemp, mkdir, writeFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createChecker } from './test-util.ts';
-import { buildDailyTask, loadDeck } from './daily-task.ts';
+import { buildDailyTask, buildLesson, lessonSeed, loadDeck } from './daily-task.ts';
 import {
   addChat, chatsDue, emptyState, isSendTime, loadState, removeChat, saveState,
-  type BotState, type Session,
+  type BotState, type ChatState, type Session,
 } from './bot-state.ts';
+import {
+  advanceTarget, advancedToday, commitCursor, commitDelivery, lessonSession, shouldAdvanceFromButton,
+} from './progression.ts';
 import { buildExercises, checkAssembled, type AssembleExercise, type ChoiceExercise } from './exercise.ts';
 import { applyTap, isFinished, isLiveTap, parseTap, render, STALE, summary } from './session.ts';
 import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
@@ -82,15 +85,34 @@ addChat(st, 42);
 st.offset = 777;
 st.chats['42'] = {
   sentDay: '2026-09-19',
-  session: { day: '2026-09-19', i: 3, missed: ['көл: озеро'], msgId: 55, picked: [1] },
+  cursor: 4,
+  session: { n: 4, i: 3, missed: ['көл: озеро'], msgId: 55, picked: [1] },
 };
 await saveState(file, st);
 const back = await loadState(file);
 check('round-trip keeps chats', Object.keys(back.chats).join() === '42', back.chats);
 check('round-trip keeps offset', back.offset === 777, back.offset);
 check('round-trip keeps sentDay', back.chats['42'].sentDay === '2026-09-19', back.chats['42']);
-check('round-trip keeps the session cursor', back.chats['42'].session?.i === 3 && back.chats['42'].session?.msgId === 55, back.chats['42'].session);
+check('round-trip keeps the cursor', back.chats['42'].cursor === 4, back.chats['42'].cursor);
+check('round-trip keeps the session step + lesson', back.chats['42'].session?.i === 3 && back.chats['42'].session?.n === 4 && back.chats['42'].session?.msgId === 55, back.chats['42'].session);
 check('round-trip keeps missed labels', back.chats['42'].session?.missed.join() === 'көл: озеро');
+
+// --- migration: cursor default + pre-cursor session drop ---
+const migFile = join(dir, 'mig.json');
+await writeFile(migFile, JSON.stringify({
+  offset: 5,
+  chats: {
+    // старая запись без cursor и с сессией по `day` (без `n`): курсор → 0, сессия → null
+    '1': { sentDay: '2026-09-19', session: { day: '2026-09-19', i: 2, missed: [], msgId: 9, picked: [] } },
+    // запись с уже новым форматом
+    '2': { sentDay: null, cursor: 7, session: null },
+  },
+}), 'utf8');
+const mig = await loadState(migFile);
+check('missing cursor migrates to 0', mig.chats['1'].cursor === 0, mig.chats['1']);
+check('pre-cursor session (no n) is dropped', mig.chats['1'].session === null, mig.chats['1'].session);
+check('existing cursor is preserved', mig.chats['2'].cursor === 7, mig.chats['2']);
+check('addChat seeds cursor 0', (() => { const s = emptyState(); addChat(s, 9); return s.chats['9'].cursor === 0; })());
 check('no .tmp left behind', (await readdir(join(dir, 'nested'))).join() === 'bot-state.json', await readdir(join(dir, 'nested')));
 
 await writeFile(file, '{ this is not json', 'utf8');
@@ -141,10 +163,10 @@ check('queue survives a rejected write', (await loadState(raceFile)).offset === 
 const bs: BotState = {
   offset: 0,
   chats: {
-    '1': { sentDay: null, session: null },
-    '2': { sentDay: '2026-09-20', session: null }, // сегодня уже получил
-    '3': { sentDay: null, session: null },
-    '4': { sentDay: null, session: null },
+    '1': { sentDay: null, cursor: 0, session: null },
+    '2': { sentDay: '2026-09-20', cursor: 0, session: null }, // сегодня уже получил
+    '3': { sentDay: null, cursor: 0, session: null },
+    '4': { sentDay: null, cursor: 0, session: null },
   },
 };
 const ev: string[] = [];
@@ -171,7 +193,7 @@ check('a chat whose send failed is kept', bs.chats['4'] !== undefined);
 check('a failed send still leaves the day claimed', bs.chats['4'].sentDay === '2026-09-20', bs.chats['4']);
 check('drops and failures are logged live', ev.some((e) => e.startsWith('log:dropped 3')) && ev.some((e) => e.startsWith('log:send to 4')), ev);
 // Отписка посреди рассылки уважается.
-const mid: BotState = { offset: 0, chats: { '7': { sentDay: null, session: null }, '8': { sentDay: null, session: null } } };
+const mid: BotState = { offset: 0, chats: { '7': { sentDay: null, cursor: 0, session: null }, '8': { sentDay: null, cursor: 0, session: null } } };
 const seen: number[] = [];
 await broadcast(mid, '2026-09-20', {
   start: async (chatId) => {
@@ -185,8 +207,24 @@ await broadcast(mid, '2026-09-20', {
 });
 check('a /stop mid-broadcast is honoured', seen.join() === '7', seen);
 
+// PR-003: чат, помеченный сегодняшним днём ПОСРЕДИ рассылки (например /next пришёл во время неё),
+// пропускается по перепроверке в цикле — не только по снимку chatsDue. Помечаем 8 из start(7).
+const midAdv: BotState = { offset: 0, chats: { '7': { sentDay: null, cursor: 0, session: null }, '8': { sentDay: null, cursor: 0, session: null } } };
+const startedAdv: number[] = [];
+await broadcast(midAdv, '2026-09-20', {
+  start: async (chatId) => {
+    startedAdv.push(chatId);
+    if (chatId === 7) midAdv.chats['8'].sentDay = '2026-09-20'; // /next продвинул 8, пока шла рассылка
+    return { kind: 'ok', messageId: 1 };
+  },
+  save: async () => {},
+  log: () => {},
+  gapMs: 0,
+});
+check('a chat advanced mid-broadcast is skipped by the in-loop recheck', startedAdv.join() === '7', startedAdv);
+
 // --- chatsDue / isSendTime ---
-const due: BotState = { offset: 0, chats: { '1': { sentDay: '2026-09-20', session: null }, '2': { sentDay: null, session: null } } };
+const due: BotState = { offset: 0, chats: { '1': { sentDay: '2026-09-20', cursor: 0, session: null }, '2': { sentDay: null, cursor: 0, session: null } } };
 check('only chats not sent today are due', chatsDue(due, '2026-09-20').join() === '2', chatsDue(due, '2026-09-20'));
 check('a new day makes everyone due', chatsDue(due, '2026-09-21').sort().join() === '1,2');
 check('before the hour it is not time', isSendTime('09:00', new Date('2026-09-20T08:59:00')) === false);
@@ -258,6 +296,7 @@ check('legacy subscribers survive', Object.keys(migrated.chats).sort().join() ==
 check('legacy offset survives', migrated.offset === 9);
 check('the old global day becomes each chat sentDay', migrated.chats['111'].sentDay === '2026-09-19');
 check('migrated chats start without a session', migrated.chats['111'].session === null);
+check('legacy chats migrate with cursor 0', migrated.chats['111'].cursor === 0 && migrated.chats['222'].cursor === 0, migrated.chats);
 const badSession = join(dir, 'bad-session.json');
 await writeFile(badSession, JSON.stringify({ chats: { '5': { sentDay: null, session: { nonsense: true } } }, offset: 0 }), 'utf8');
 check('an ill-shaped session becomes null', (await loadState(badSession)).chats['5'].session === null);
@@ -375,93 +414,138 @@ check(
 const dup = { kind: 'sentence', prompt: 'p', bank: makeBank(['мен', 'аны', 'мен'], 3), answer: 'мен аны мен', label: 'l' } as AssembleExercise;
 check('duplicate words assemble correctly', checkAssembled(dup, [0, 1, 2]));
 
-// --- parseTap: клиентские данные не доверенные ---
-check('valid answer tap', parseTap('a:2026-09-20:3:2')?.op === 'answer');
-check('valid word tap', parseTap('w:2026-09-20:0:5')?.op === 'word');
-check('valid reset', parseTap('reset:2026-09-20:0')?.op === 'reset');
-check('unknown op rejected', parseTap('x:2026-09-20:0:0') === null);
+// --- parseTap: клиентские данные не доверенные (идентичность теперь номер урока n, не день) ---
+const answerTap = parseTap('a:4:3:2');
+check('valid answer tap', answerTap?.op === 'answer' && answerTap.n === 4 && answerTap.i === 3 && answerTap.arg === 2, answerTap);
+check('valid word tap', parseTap('w:4:0:5')?.op === 'word');
+check('valid reset', parseTap('reset:4:0')?.op === 'reset');
+const nextTap = parseTap('next:4');
+check('valid next tap', nextTap?.op === 'next' && nextTap.n === 4, nextTap);
+check('unknown op rejected', parseTap('x:4:0:0') === null);
 check('garbage rejected', parseTap('nonsense') === null);
-check('bad day rejected', parseTap('a:yesterday:0:0') === null);
-check('negative index rejected', parseTap('a:2026-09-20:-1:0') === null);
-check('non-numeric arg rejected', parseTap('a:2026-09-20:0:abc') === null);
+// Прежний формат нёс дату в поле идентичности — теперь там только цифры номера урока.
+check('old date-shaped id rejected', parseTap('a:2026-09-20:0:0') === null);
+check('non-numeric lesson rejected', parseTap('a:x:0:0') === null);
+check('negative index rejected', parseTap('a:4:-1:0') === null);
+check('non-numeric arg rejected', parseTap('a:4:0:abc') === null);
 // Number('') === 0: пустое поле не должно разбираться как индекс 0.
-check('empty index rejected', parseTap('a:2026-09-20::5') === null);
-check('empty arg rejected', parseTap('a:2026-09-20:3:') === null);
-check('empty reset index rejected', parseTap('reset:2026-09-20:') === null);
+check('empty lesson rejected', parseTap('a::0:5') === null);
+check('empty index rejected', parseTap('a:4::5') === null);
+check('empty arg rejected', parseTap('a:4:3:') === null);
+check('empty reset index rejected', parseTap('reset:4:') === null);
+check('next without lesson rejected', parseTap('next:') === null);
 
-// --- машина сессии ---
-const s0: Session = { day: '2026-09-20', i: 1, missed: [], msgId: 10, picked: [] };
+// --- машина сессии (идентичность теперь номер урока n) ---
+const LN = 4; // произвольный номер урока для фикстур; идентичность, не влияет на состав упражнений
+const s0: Session = { n: LN, i: 1, missed: [], msgId: 10, picked: [] };
 const score = (x: Session) => x.i - x.missed.length;
 const d1 = exercises[1] as ChoiceExercise;
 const rightIdx = d1.options.indexOf(d1.answer);
-const right = applyTap({ ...s0 }, exercises, { op: 'answer', day: s0.day, i: 1, arg: rightIdx });
+const right = applyTap({ ...s0 }, exercises, { op: 'answer', n: LN, i: 1, arg: rightIdx });
 check('a correct answer advances and shows feedback', right.view !== null && right.view.text.includes('✅'));
 const sWrong: Session = { ...s0, missed: [] };
-applyTap(sWrong, exercises, { op: 'answer', day: s0.day, i: 1, arg: (rightIdx + 1) % 4 });
+applyTap(sWrong, exercises, { op: 'answer', n: LN, i: 1, arg: (rightIdx + 1) % 4 });
 check('a wrong answer is recorded', sWrong.missed.length === 1 && sWrong.missed[0].endsWith(d1.answer), sWrong.missed);
 check('a wrong answer still advances', sWrong.i === 2, sWrong.i);
 const sCount: Session = { ...s0, missed: [] };
-applyTap(sCount, exercises, { op: 'answer', day: s0.day, i: 1, arg: rightIdx });
+applyTap(sCount, exercises, { op: 'answer', n: LN, i: 1, arg: rightIdx });
 check('a correct answer advances without a miss', sCount.i === 2 && sCount.missed.length === 0);
 const before = JSON.stringify(sCount);
-const stale = applyTap(sCount, exercises, { op: 'answer', day: s0.day, i: 1, arg: rightIdx });
+const stale = applyTap(sCount, exercises, { op: 'answer', n: LN, i: 1, arg: rightIdx });
 check('a repeat tap changes nothing', JSON.stringify(sCount) === before && stale.view === null && stale.toast === STALE, stale.toast);
-const old = applyTap({ ...sCount }, exercises, { op: 'answer', day: '2026-09-19', i: 2, arg: 0 });
-check('yesterday tap is refused', old.view === null && typeof old.toast === 'string');
-const oob = applyTap({ ...s0 }, exercises, { op: 'answer', day: s0.day, i: 1, arg: 99 });
+// Тап по ДРУГОМУ уроку отсекается ровно как раньше вчерашний: номер урока в тапе не совпал с
+// сессией. Без этого рубежа тап по прежнему уроку зачёлся бы против упражнения нового.
+const cross = applyTap({ ...sCount }, exercises, { op: 'answer', n: LN + 1, i: 2, arg: 0 });
+check('a tap for another lesson is refused', cross.view === null && cross.toast === STALE);
+const oob = applyTap({ ...s0 }, exercises, { op: 'answer', n: LN, i: 1, arg: 99 });
 check('out-of-range option is refused', oob.view === null, oob.toast);
 
 // --- сборка предложения в сессии ---
-const sSent: Session = { day: '2026-09-20', i: 0, missed: [], msgId: 1, picked: [] };
+const sSent: Session = { n: LN, i: 0, missed: [], msgId: 1, picked: [] };
 const bank = (exercises[0] as AssembleExercise).bank;
 // Снимок экрана сборки ДО того, как цикл ниже сдвинет курсор: только здесь встречаются
 // кодировки `w:` и `reset:`, длину которых проверяет AC-14.
 const sentenceView = render({ ...sSent, picked: [bank[0].id] }, exercises);
-applyTap(sSent, exercises, { op: 'word', day: sSent.day, i: 0, arg: bank[0].id });
+applyTap(sSent, exercises, { op: 'word', n: LN, i: 0, arg: bank[0].id });
 check('a tapped word is recorded', sSent.picked.length === 1 && sSent.i === 0);
-const dupTap = applyTap(sSent, exercises, { op: 'word', day: sSent.day, i: 0, arg: bank[0].id });
+const dupTap = applyTap(sSent, exercises, { op: 'word', n: LN, i: 0, arg: bank[0].id });
 check('the same word cannot be tapped twice', sSent.picked.length === 1 && dupTap.view === null);
-const oobWord = applyTap(sSent, exercises, { op: 'word', day: sSent.day, i: 0, arg: 999 });
+const oobWord = applyTap(sSent, exercises, { op: 'word', n: LN, i: 0, arg: 999 });
 check('a word id outside the bank is refused', oobWord.view === null, oobWord.toast);
-applyTap(sSent, exercises, { op: 'reset', day: sSent.day, i: 0 });
+applyTap(sSent, exercises, { op: 'reset', n: LN, i: 0 });
 check('reset clears the picks', sSent.picked.length === 0 && sSent.i === 0);
 // Повторный сброс при пустом наборе НЕ перерисовывает: иначе Telegram ответил бы 400
 // «message is not modified», а вызывающий код продублировал бы сессию.
-const emptyReset = applyTap(sSent, exercises, { op: 'reset', day: sSent.day, i: 0 });
+const emptyReset = applyTap(sSent, exercises, { op: 'reset', n: LN, i: 0 });
 check('resetting an empty pick is a no-op', emptyReset.view === null, emptyReset.toast);
 for (const id of [...Array(bank.length).keys()]) {
-  applyTap(sSent, exercises, { op: 'word', day: sSent.day, i: 0, arg: id });
+  applyTap(sSent, exercises, { op: 'word', n: LN, i: 0, arg: id });
 }
 check('assembling in order scores and advances', sSent.i === 1 && score(sSent) === 1, sSent);
 
 // --- итог ---
-const done16: Session = { day: '2026-09-20', i: 16, missed: ['көл: озеро', 'үй → Куда? (барыш): үйгө'], msgId: 1, picked: [] };
+const done16: Session = { n: LN, i: 16, missed: ['көл: озеро', 'үй → Куда? (барыш): үйгө'], msgId: 1, picked: [] };
 check('finished session is detected', isFinished(done16, exercises.length) && !isFinished(s0, exercises.length));
 const fin = summary(done16, exercises.length);
 // Счёт выводится как «отвечено минус промахи»: 16 − 2.
 check('summary derives the score from the misses', fin.text.includes('14 из 16'), fin.text);
 check('render past the last exercise is the summary', render(done16, exercises).text === fin.text);
 // Последний ответ тоже получает подтверждение — иначе шестнадцатое упражнение осталось бы без ✅/❌.
-const last: Session = { day: '2026-09-20', i: 15, missed: [], msgId: 1, picked: [] };
+const last: Session = { n: LN, i: 15, missed: [], msgId: 1, picked: [] };
 const lastEx = exercises[15] as ChoiceExercise;
-const lastView = applyTap(last, exercises, { op: 'answer', day: last.day, i: 15, arg: lastEx.options.indexOf(lastEx.answer) });
+const lastView = applyTap(last, exercises, { op: 'answer', n: LN, i: 15, arg: lastEx.options.indexOf(lastEx.answer) });
 check('the last answer is confirmed on the summary screen', lastView.view !== null && lastView.view.text.includes('✅') && lastView.view.text.includes('16 из 16'), lastView.view?.text);
 check('summary lists the misses', fin.text.includes('көл: озеро'));
-check('summary has no buttons', fin.keyboard.length === 0);
+// Итог теперь предлагает «Дальше ▶» — одна кнопка с next-кодировкой текущего урока.
+check('summary offers a single Next button', fin.keyboard.length === 1 && fin.keyboard[0].length === 1, fin.keyboard);
+check('the Next button carries the current lesson', fin.keyboard[0][0].callback_data === `next:${LN}`, fin.keyboard[0][0].callback_data);
 
 // --- callback_data влезает в лимит Telegram ---
 const allData = [sentenceView, render({ ...s0, i: 1 }, exercises), fin]
   .flatMap((v) => v.keyboard.flat().map((b) => b.callback_data));
-check('every kind of callback_data is measured', allData.some((d) => d.startsWith('w:')) && allData.some((d) => d.startsWith('reset:')) && allData.some((d) => d.startsWith('a:')), allData);
+check('every kind of callback_data is measured',
+  allData.some((d) => d.startsWith('w:')) && allData.some((d) => d.startsWith('reset:')) &&
+  allData.some((d) => d.startsWith('a:')) && allData.some((d) => d.startsWith('next:')), allData);
 check('every callback_data is under 64 bytes', allData.every((d) => Buffer.byteLength(d) < 64), Math.max(0, ...allData.map((d) => Buffer.byteLength(d))));
 
-// --- isLiveTap: та самая строка, которой закрыт stale-session ---
-const liveS: Session = { day: '2026-09-20', i: 2, missed: [], msgId: 77, picked: [] };
-check('the live message on the live day is accepted', isLiveTap(liveS, 77, '2026-09-20') === true);
-check('a foreign message id is refused', isLiveTap(liveS, 78, '2026-09-20') === false);
-// Брошенная вчерашняя сессия: то же сообщение, но день сменился. Без этой проверки тап зачёлся
-// бы против СЕГОДНЯШНЕГО упражнения при вчерашнем вопросе на экране.
-check('yesterday session on today clock is refused', isLiveTap(liveS, 77, '2026-09-21') === false);
+// --- isLiveTap: теперь только msgId (день ни при чём — единица работы урок, не сутки) ---
+const liveS: Session = { n: LN, i: 2, missed: [], msgId: 77, picked: [] };
+check('the live message is accepted by msgId', isLiveTap(liveS, 77) === true);
+check('a foreign message id is refused', isLiveTap(liveS, 78) === false);
+
+// --- прогрессия: чистые правила курсора (PR-002 — проверяемы без bot.ts) ---
+check('advanceTarget is the next lesson', advanceTarget({ sentDay: null, cursor: 3, session: null }) === 4);
+check('advancedToday matches the sent day', advancedToday({ sentDay: '2026-09-20', cursor: 0, session: null }, '2026-09-20') === true);
+check('advancedToday is false on a new day', advancedToday({ sentDay: '2026-09-19', cursor: 0, session: null }, '2026-09-20') === false);
+// Монотонный коммит: продвижение не откатывает курсор, даже если ранняя отправка разрешилась позже.
+check('commitCursor never regresses', commitCursor(5, 6) === 6 && commitCursor(6, 5) === 6 && commitCursor(0, 0) === 0);
+// Незаконченная сессия того же урока продолжается (picked сброшен); чужой урок / доигранная — заново.
+const resume = lessonSession({ n: LN, i: 3, missed: ['x'], msgId: 9, picked: [1, 2] }, LN, exercises.length);
+check('lessonSession resumes the same unfinished lesson', resume.i === 3 && resume.missed.join() === 'x' && resume.picked.length === 0, resume);
+const otherLesson = lessonSession({ n: LN, i: 3, missed: ['x'], msgId: 9, picked: [] }, LN + 1, exercises.length);
+check('lessonSession starts fresh for a different lesson', otherLesson.i === 0 && otherLesson.n === LN + 1 && otherLesson.missed.length === 0, otherLesson);
+const finishedPrev = lessonSession({ n: LN, i: exercises.length, missed: [], msgId: 9, picked: [] }, LN, exercises.length);
+check('lessonSession starts fresh when the previous lesson was finished', finishedPrev.i === 0, finishedPrev);
+const noPrev = lessonSession(null, 7, exercises.length);
+check('lessonSession starts fresh with no prior session', noPrev.i === 0 && noPrev.n === 7, noPrev);
+// «Дальше ▶» инертна, если кнопка не с текущего урока (повтор/устаревший тап по старому итогу).
+check('button advances only from the current lesson', shouldAdvanceFromButton({ sentDay: null, cursor: 3, session: null }, 3) === true);
+check('button is inert on a stale/older lesson tap', shouldAdvanceFromButton({ sentDay: null, cursor: 3, session: null }, 2) === false);
+// commitDelivery ставит сессию, монотонно двигает курсор и отмечает день (вызывается только на ok).
+const cd: ChatState = { sentDay: '2026-09-19', cursor: 5, session: null };
+const cdSession: Session = { n: 6, i: 0, missed: [], msgId: 99, picked: [] };
+commitDelivery(cd, cdSession, 6, '2026-09-20');
+check('commitDelivery advances the cursor and marks the day', cd.cursor === 6 && cd.sentDay === '2026-09-20' && cd.session === cdSession, cd);
+commitDelivery(cd, { n: 4, i: 0, missed: [], msgId: 1, picked: [] }, 4, '2026-09-20');
+check('commitDelivery never regresses the cursor', cd.cursor === 6, cd.cursor);
+
+// --- buildLesson: детерминизм и несовпадение с соседями (прогрессия идёт по номеру, не по дате) ---
+check('buildLesson is deterministic for a lesson number', JSON.stringify(buildLesson(deck, 5)) === JSON.stringify(buildLesson(deck, 5)));
+check('consecutive lessons differ', JSON.stringify(buildLesson(deck, 5)) !== JSON.stringify(buildLesson(deck, 6)));
+check('lessonSeed spreads consecutive lessons', lessonSeed(5) !== lessonSeed(6));
+// Урок собирается тем же генератором: тот же состав (1 предложение, 3 дрилла, 12 слов).
+const lesson5 = buildLesson(deck, 5);
+check('a lesson has the same shape as a daily task', lesson5.drills.length === 3 && lesson5.words.length === 12);
 
 await rm(dir, { recursive: true, force: true });
 done('BOT OK');

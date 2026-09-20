@@ -6,16 +6,17 @@
 
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { buildDailyTask, loadDeck } from './daily-task.ts';
+import { buildLesson, loadDeck } from './daily-task.ts';
 import { buildExercises } from './exercise.ts';
 import {
-  addChat, chatsDue, isSendTime, loadState, removeChat, saveState, type Session,
+  addChat, chatsDue, isSendTime, loadState, removeChat, saveState,
 } from './bot-state.ts';
+import { advanceTarget, commitDelivery, lessonSession, shouldAdvanceFromButton } from './progression.ts';
 import { broadcast } from './broadcast.ts';
 import {
   answerCallback, editMessageText, getUpdates, isMessageGone, sendMessage, type SendOutcome,
 } from './telegram.ts';
-import { applyTap, isFinished, isLiveTap, parseTap, render, STALE } from './session.ts';
+import { applyTap, isLiveTap, parseTap, render, STALE } from './session.ts';
 import { todayStr } from '../src/lib/daily.ts';
 
 // Optional app/.env for the token / send time / state path (see .env.example). Real env vars win.
@@ -64,54 +65,48 @@ console.log(
 );
 
 const GREETING =
-  'Салам! Раз в сутки я буду присылать задание по кыргызскому: собрать предложение, ' +
-  'разобрать суффиксы и вспомнить слова дня. Отвечать — кнопками. ' +
-  'Вернуться к заданию — /task, отписаться — /stop.';
+  'Салам! Раз в сутки я буду присылать урок по кыргызскому: собрать предложение, ' +
+  'разобрать суффиксы и вспомнить слова. Отвечать — кнопками. Хочешь быстрее — /next ' +
+  '(или кнопка «Дальше ▶»). Повторить текущий урок — /task, отписаться — /stop.';
 
 /**
- * Сегодняшние упражнения, пересобираемые при смене суток.
- *
- * Дня в аргументах намеренно НЕТ. `buildDailyTask` умеет строить любой день — у него есть
- * параметр `now`, — но кэш здесь хранит ровно один, и всё, что относится к прошлым дням,
- * отсекается на входе (`isLiveTap` в handleTap). Аргумент добавил бы измерение кэша, которое
- * никому не нужно, и открыл бы путь к тому самому дефекту, который отсекается выше.
+ * Упражнения урока N. Кэш по номеру урока (bounded): разные чаты — на разных уроках, поэтому кэш
+ * на один элемент, как раньше на один день, промахивался бы постоянно. buildExercises чист, так
+ * что промах безопасен — те же упражнения пересобираются одинаково из lessonSeed(n).
  */
-let today = { day: '', exercises: [] as ReturnType<typeof buildExercises> };
-function todayExercises() {
-  const day = todayStr();
-  if (today.day !== day) today = { day, exercises: buildExercises(buildDailyTask(deck), deck) };
-  return today.exercises;
+const lessons = new Map<number, ReturnType<typeof buildExercises>>();
+function lessonExercises(n: number): ReturnType<typeof buildExercises> {
+  let ex = lessons.get(n);
+  if (!ex) {
+    ex = buildExercises(buildLesson(deck, n), deck);
+    lessons.set(n, ex);
+    // Грубый LRU-хвост: держим кэш ограниченным, вытесняя самый старый ключ.
+    if (lessons.size > 64) lessons.delete(lessons.keys().next().value as number);
+  }
+  return ex;
 }
 
 /**
- * Начать или перерисовать сессию в НОВОМ сообщении. Используется и при подписке, и рассылкой,
- * и командой /task: во всех трёх случаях нужно свежее сообщение, которое дальше редактируется.
+ * Выдать урок N в НОВОМ сообщении. Один путь для /start, /task, /next, «Дальше ▶» и рассылки —
+ * различаются лишь тем, какой N передан: текущий курсор (/start, /task) или следующий (продвижение).
  *
- * Успешная отправка отмечает чату сегодняшний день — для всех трёх путей одинаково. Для /task это
- * значит, что задание, открытое до часа рассылки, рассылку в этот день отменяет. Так и задумано:
- * иначе пуш в 09:00 начал бы заново то же задание, которое человек, возможно, уже прошёл.
- * (Рассылка ставит отметку ещё и ДО вызова — это её страховка от повторного входа и обрыва.)
+ * Курсор и отметка дня двигаются ТОЛЬКО при успешной отправке. Упавшая отправка урок не
+ * пропускает (получит его в следующий раз) и день не отмечает. Коммит курсора монотонный
+ * (commitCursor): продвижение никогда не откатывает курсор назад, даже если ранняя отправка
+ * разрешилась после более поздней. Отметка sentDay=сегодня заодно гасит дневной пуш этому чату:
+ * тот, кто уже открыл урок сегодня (в т.ч. через /start или /next), второй раз в этот день не
+ * получает — так /next и рассылка остаются связаны одним курсором.
  */
-async function startSession(chatId: number): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
-  const day = todayStr();
+async function deliverLesson(chatId: number, n: number): Promise<Exclude<SendOutcome, { kind: 'retry' }>> {
   const chat = state.chats[String(chatId)];
   if (!chat) return { kind: 'drop', reason: 'not subscribed' };
-  const exercises = todayExercises();
-  // Незаконченная сегодняшняя сессия продолжается с того же места; всё остальное — вчерашняя,
-  // законченная или отсутствующая — начинается заново. Доигранная сессия начинается сначала
-  // осознанно: /task после «16 из 16» — это просьба потренироваться ещё, а не показать итог,
-  // который и так остался в чате.
-  const prev = chat.session;
-  const resumable = prev !== null && prev.day === day && !isFinished(prev, exercises.length);
-  const fresh: Session = resumable
-    ? { ...prev, picked: [] }
-    : { day, i: 0, missed: [], msgId: 0, picked: [] };
+  const exercises = lessonExercises(n);
+  const fresh = lessonSession(chat.session, n, exercises.length);
   const view = render(fresh, exercises);
   const outcome = await sendMessage(token, chatId, view.text, view.keyboard);
   if (outcome.kind === 'ok') {
     fresh.msgId = outcome.messageId;
-    chat.session = fresh;
-    chat.sentDay = day;
+    commitDelivery(chat, fresh, n, todayStr());
     await saveState(STATE_FILE, state);
   }
   return outcome;
@@ -131,16 +126,16 @@ async function handleTap(
   const chat = state.chats[String(chatId)];
   const tap = parseTap(data);
   const session = chat?.session;
-  // Вчерашняя сессия отсекается здесь, а не в applyTap: applyTap сверяет тап с сессией, но
-  // упражнения строятся только на сегодня, и принятый вчерашний тап зачёлся бы против
-  // сегодняшнего упражнения при вчерашнем вопросе на экране. Сам предикат живёт в session.ts,
-  // где его есть чем покрыть тестом.
-  if (!session || !tap || !isLiveTap(session, messageId, todayStr())) {
+  // Нажатие по прежнему экрану отсекается здесь по msgId: продвижение заменяет chat.session новым
+  // сообщением, поэтому старое перестаёт быть живым. Номер урока в тапе — второй рубеж в applyTap.
+  if (!session || !tap || tap.op === 'next' || !isLiveTap(session, messageId)) {
+    // tap.op === 'next' сюда не доходит (маршрутизируется в handleNext до handleTap); проверка
+    // защитная и заодно сужает тип tap до ходов внутри сессии для строк ниже.
     await answerCallback(token, callbackId, STALE);
     return;
   }
 
-  const exercises = todayExercises();
+  const exercises = lessonExercises(session.n);
   const result = applyTap(session, exercises, tap);
   await answerCallback(token, callbackId, result.toast);
   if (!result.view) return;
@@ -177,8 +172,10 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
     const added = addChat(state, chatId);
     await saveState(STATE_FILE, state);
     if (added) await sendMessage(token, chatId, GREETING);
-    // Подписка сразу даёт задание: ждать до завтрашнего утра незачем.
-    await startSession(chatId);
+    // Подписка сразу даёт текущий урок (для нового — урок 0): ждать до утра незачем. Без продвижения.
+    // Читаем чат заново под null-check: /stop мог прийти, пока шли await выше.
+    const chat = state.chats[String(chatId)];
+    if (chat) await deliverLesson(chatId, chat.cursor);
     console.log(`[bot] /start ${chatId} (${added ? 'new' : 'already subscribed'})`);
   } else if (cmd === '/stop') {
     const removed = removeChat(state, chatId);
@@ -186,14 +183,36 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
     await sendMessage(token, chatId, removed ? 'Отписал. Вернуться — /start.' : 'Вы и не были подписаны.');
     console.log(`[bot] /stop ${chatId} (${removed ? 'removed' : 'was not subscribed'})`);
   } else if (cmd === '/task') {
-    if (!state.chats[String(chatId)]) {
+    const chat = state.chats[String(chatId)];
+    if (!chat) {
       await sendMessage(token, chatId, 'Сначала подпишитесь — /start.');
       return;
     }
-    await startSession(chatId);
-    console.log(`[bot] /task ${chatId}`);
+    // Текущий урок заново/с продолжения — курсор не двигаем.
+    await deliverLesson(chatId, chat.cursor);
+    console.log(`[bot] /task ${chatId} (lesson ${chat.cursor})`);
+  } else if (cmd === '/next') {
+    const chat = state.chats[String(chatId)];
+    if (!chat) {
+      await sendMessage(token, chatId, 'Сначала подпишитесь — /start.');
+      return;
+    }
+    // Следующий урок сразу, без ограничения на число раз в день (запойное прохождение разрешено).
+    await deliverLesson(chatId, advanceTarget(chat));
+    console.log(`[bot] /next ${chatId} -> lesson ${chat.cursor}`);
   }
   // Anything else is ignored on purpose: the bot never echoes user input.
+}
+
+/**
+ * «Дальше ▶» с итогового экрана. Двигаем курсор, только если кнопка с текущего урока (n === cursor):
+ * повторный или устаревший тап по старому итогу ничего не делает. answerCallbackQuery — ровно раз
+ * на каждом пути, как и у handleTap: иначе у клиента крутился бы спиннер.
+ */
+async function handleNext(chatId: number, callbackId: string, n: number): Promise<void> {
+  const chat = state.chats[String(chatId)];
+  await answerCallback(token, callbackId, chat ? 'Дальше ▶' : STALE);
+  if (chat && shouldAdvanceFromButton(chat, n)) await deliverLesson(chatId, advanceTarget(chat));
 }
 
 /**
@@ -210,12 +229,19 @@ let broadcasting = false;
 async function sendDailyTask(): Promise<void> {
   const day = todayStr();
   const r = await broadcast(state, day, {
-    start: startSession,
+    // Дневной пуш двигает тот же курсор, что и /next: следующий урок. Связь заданий — этот общий
+    // курсор. commitDelivery внутри deliverLesson делает продвижение монотонным и идемпотентным.
+    // Чат читаем под null-check: /stop мог удалить его в окне await этой же рассылки (broadcast
+    // уже прошёл свою проверку !chat), тогда просто роняем в drop, а не в TypeError на .cursor.
+    start: (id) => {
+      const c = state.chats[String(id)];
+      return c ? deliverLesson(id, advanceTarget(c)) : Promise.resolve({ kind: 'drop', reason: 'not subscribed' });
+    },
     save: (s) => saveState(STATE_FILE, s),
     log: (line) => console.log(`[bot] ${line}`),
     gapMs: SEND_GAP_MS,
   });
-  console.log(`[bot] daily task ${day}: ${r.sent} sent, ${r.dropped} dropped, ${r.failed} failed`);
+  console.log(`[bot] daily ${day}: ${r.sent} sent, ${r.dropped} dropped, ${r.failed} failed`);
 }
 
 setInterval(() => {
@@ -279,7 +305,13 @@ while (!stopping) {
       const text = u.message?.text;
       if (chatId !== undefined && text) await handleCommand(chatId, text);
       const cb = u.callback_query;
-      if (cb?.data && cb.message) await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
+      if (cb?.data && cb.message) {
+        // «Дальше ▶» — не ход внутри сессии (нет msgId-привязки к экрану): маршрутизируем отдельно
+        // до handleTap, который отсёк бы его как неживой тап.
+        const tap = parseTap(cb.data);
+        if (tap?.op === 'next') await handleNext(cb.message.chat.id, cb.id, tap.n);
+        else await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
+      }
       // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом
       // пути» должно держаться буквально: иначе у клиента остался бы крутящийся спиннер.
       else if (cb) await answerCallback(token, cb.id, STALE);

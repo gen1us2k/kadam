@@ -3,6 +3,7 @@
 
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chatsDue, removeChat, type BotState } from './bot-state.ts';
+import { advancedToday } from './progression.ts';
 import type { SendOutcome } from './telegram.ts';
 
 export interface BroadcastDeps {
@@ -36,6 +37,10 @@ export async function broadcast(state: BotState, day: string, deps: BroadcastDep
   for (const chatId of chatsDue(state, day)) {
     const chat = state.chats[String(chatId)];
     if (!chat) continue; // отписался, пока шла рассылка
+    // Перепроверка на момент обработки, а не только на снимке chatsDue: если /next пришёл в ходе
+    // рассылки и уже отметил этот чат сегодняшним днём, дневной пуш его пропускает — иначе чат
+    // продвинулся бы дважды (вручную и рассылкой) за один день.
+    if (advancedToday(chat, day)) continue;
     chat.sentDay = day;
     await deps.save(state);
 

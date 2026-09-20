@@ -44,3 +44,28 @@ export function buildDailyTask(deck: VocabRow[], now = new Date()): DailyTask {
   };
 }
 
+/**
+ * Сид урока по его номеру. Прогрессия бота, в отличие от сайта, идёт не по календарю, а по
+ * курсору N: урок N собирается детерминированно из этого сида. Разнесено с daySeed по диапазону
+ * (сайт: YYYYMMDD ~ 2·10^7), чтобы урок 0 не совпал случайно с каким-то календарным днём.
+ */
+export function lessonSeed(n: number): number {
+  return 100_000_000 + n * 2_654_435_761; // Knuth multiplicative; спреды соседние n, вне диапазона daySeed
+}
+
+/**
+ * Урок N: тот же генератор, что и задание дня, но сид берётся из номера урока, а не из даты.
+ * Поле `day` несёт номер урока строкой лишь для совместимости формы DailyTask; бот его для
+ * идентичности сессии не использует (см. Session.n). buildExercises читает только task.seed.
+ */
+export function buildLesson(deck: VocabRow[], n: number): DailyTask {
+  const seed = lessonSeed(n);
+  return {
+    day: `lesson-${n}`,
+    seed,
+    sentence: pickSentences(1, seed)[0],
+    drills: buildDrills(3, seed),
+    words: pickDeterministic(deck, WORD_COUNT, seed),
+  };
+}
+
