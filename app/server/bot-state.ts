@@ -7,6 +7,14 @@
 
 import { readFile, writeFile, rename, mkdir, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import type { TelegramFrom } from './telegram.ts';
+
+/** Личность подписчика: id обязателен, имя/username — как пришли (могут отсутствовать/меняться). */
+export interface UserIdentity {
+  id: number;
+  username?: string;
+  firstName?: string;
+}
 
 export interface Session {
   /**
@@ -46,6 +54,8 @@ export interface ChatState {
   cursor: number;
   /** Персональный набор для тренировки: cardId (`kg|ru`), порядок = порядок добавления. */
   practice: string[];
+  /** Кто это (from). Метаданные для логов/наглядности; на ключевание прогресса не влияет. */
+  user?: UserIdentity;
   session: Session | null;
 }
 
@@ -62,6 +72,25 @@ export function emptyState(): BotState {
 
 /** Конечное число или 0. `Number()` нужен лишь потому, что `Number.isFinite` не сужает тип. */
 const num = (v: unknown): number => (Number.isFinite(v) ? Number(v) : 0);
+
+/**
+ * Санитайзинг личности из НЕДОВЕРЕННОГО from (или уже сохранённого user). Берём только id
+ * (конечное число), username и имя (строки), прочее игнорируем. Принимает оба вида имени: сырое
+ * from.first_name и сохранённое firstName, чтобы round-trip был стабилен. Из имени вырезаем ВСЕ
+ * управляющие символы C0 (CR/LF, а также ESC 0x1b и пр.): имя свободнотекстовое и untrusted, иначе
+ * подделало бы строку или ANSI-последовательность в терминале оператора (CWE-117). Длину режем до 64
+ * (лимит Telegram) как страховку.
+ */
+export function parseUser(raw: unknown): UserIdentity | undefined {
+  const r = (raw ?? {}) as Partial<TelegramFrom> & Partial<UserIdentity>;
+  if (!Number.isFinite(r.id)) return undefined;
+  const username = typeof r.username === 'string' ? r.username : undefined;
+  const firstRaw = typeof r.first_name === 'string' ? r.first_name
+    : typeof r.firstName === 'string' ? r.firstName : undefined;
+  // eslint-disable-next-line no-control-regex -- намеренно вырезаем управляющие C0 из untrusted имени
+  const firstName = firstRaw?.replace(/[\u0000-\u001f]+/g, " ").slice(0, 64);
+  return { id: num(r.id), ...(username ? { username } : {}), ...(firstName ? { firstName } : {}) };
+}
 
 /** Одна запись чата с безопасными значениями по умолчанию. */
 function chatFrom(raw: unknown): ChatState {
@@ -87,10 +116,12 @@ function chatFrom(raw: unknown): ChatState {
           picked: Array.isArray(s.picked) ? s.picked.filter((x) => Number.isFinite(x)) : [],
         }
       : null;
+  const user = parseUser(r.user); // отсутствует у старых записей → undefined
   return {
     sentDay: typeof r.sentDay === 'string' ? r.sentDay : null,
     cursor: num(r.cursor), // отсутствует у старых записей → 0
     practice: Array.isArray(r.practice) ? r.practice.filter((c): c is string => typeof c === 'string') : [],
+    ...(user ? { user } : {}),
     session,
   };
 }
@@ -194,6 +225,20 @@ export function addChat(state: BotState, chatId: number): boolean {
   const key = String(chatId);
   if (state.chats[key]) return false;
   state.chats[key] = { sentDay: null, cursor: 0, practice: [], session: null };
+  return true;
+}
+
+/**
+ * Записать/обновить личность подписчика по пришедшему from. Возвращает true, если что-то изменилось
+ * (для лога). Незнакомый чат (ещё не /start) НЕ создаём — только у существующего: подписка идёт
+ * только через addChat, а личность — необязательные метаданные поверх неё.
+ */
+export function rememberUser(state: BotState, chatId: number, from: unknown): boolean {
+  const chat = state.chats[String(chatId)];
+  const next = parseUser(from);
+  if (!chat || !next) return false;
+  if (JSON.stringify(chat.user) === JSON.stringify(next)) return false;
+  chat.user = next;
   return true;
 }
 

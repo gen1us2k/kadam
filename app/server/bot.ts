@@ -9,7 +9,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { buildLesson, loadDeck } from './daily-task.ts';
 import { buildExercises, buildGrammarExercises, buildPracticeExercises, grammarTrack, GRAMMAR_TRACKS } from './exercise.ts';
 import {
-  addChat, chatsDue, isSendTime, loadState, removeChat, saveState, type Session,
+  addChat, chatsDue, isSendTime, loadState, rememberUser, removeChat, saveState, type Session,
 } from './bot-state.ts';
 import { advanceTarget, commitDelivery, lessonSession, shouldAdvanceFromButton } from './progression.ts';
 import {
@@ -297,7 +297,8 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
     // Читаем чат заново под null-check: /stop мог прийти, пока шли await выше.
     const chat = state.chats[String(chatId)];
     if (chat) await deliverLesson(chatId, chat.cursor);
-    console.log(`[bot] /start ${chatId} (${added ? 'new' : 'already subscribed'})`);
+    const who = chat?.user ? `@${chat.user.username ?? '—'} (${chat.user.firstName ?? '?'}, id ${chat.user.id})` : `id ${chatId}`;
+    console.log(`[bot] /start ${who} (${added ? 'new' : 'already subscribed'})`);
   } else if (cmd === '/stop') {
     const removed = removeChat(state, chatId);
     await saveState(STATE_FILE, state);
@@ -449,6 +450,12 @@ while (!stopping) {
       // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом
       // пути» должно держаться буквально: иначе у клиента остался бы крутящийся спиннер.
       else if (cb) await answerCallback(token, cb.id, STALE);
+
+      // Личность отправителя — метаданные для логов/наглядности. Обновляем у уже подписанного чата
+      // (для /start он создан выше); client-supplied from санитайзит parseUser. Сохранит цикл ниже.
+      const from = u.message?.from ?? cb?.from;
+      const whoChat = cb?.message?.chat.id ?? chatId;
+      if (from && whoChat !== undefined) rememberUser(state, whoChat, from);
     } catch (e) {
       console.error(`[bot] update ${u.update_id} failed: ${e instanceof Error ? e.message : e}`);
     }

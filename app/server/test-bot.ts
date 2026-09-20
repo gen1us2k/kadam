@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { createChecker } from './test-util.ts';
 import { buildDailyTask, buildLesson, lessonSeed, loadDeck } from './daily-task.ts';
 import {
-  addChat, chatsDue, emptyState, isSendTime, loadState, removeChat, saveState,
+  addChat, chatsDue, emptyState, isSendTime, loadState, parseUser, rememberUser, removeChat, saveState,
   type BotState, type ChatState, type Session,
 } from './bot-state.ts';
 import {
@@ -661,6 +661,35 @@ check('descriptions are non-empty and within 256 chars', BOT_COMMANDS.every((c) 
 check('descriptions stay HTML-safe (rendered under parse_mode HTML)', BOT_COMMANDS.every((c) => !/[<>&]/.test(c.description)));
 const help = commandsHelp();
 check('commandsHelp lists every command as /cmd — desc', BOT_COMMANDS.every((c) => help.includes(`/${c.command} — ${c.description}`)), help);
+
+// --- user identity ---
+const pu = parseUser({ id: 42, username: 'bob', first_name: 'Боб', extra: 'ignored' });
+check('parseUser maps raw from → identity', pu?.id === 42 && pu.username === 'bob' && pu.firstName === 'Боб', pu);
+check('parseUser drops a non-finite id', parseUser({ username: 'x' }) === undefined && parseUser({ id: NaN }) === undefined);
+check('parseUser drops non-string username/name', (() => { const u = parseUser({ id: 1, username: 5, first_name: {} }); return u?.id === 1 && u.username === undefined && u.firstName === undefined; })());
+check('parseUser accepts the persisted shape (firstName)', parseUser({ id: 7, firstName: 'Ана' })?.firstName === 'Ана');
+check('parseUser strips CR/LF from the name (log hygiene)', parseUser({ id: 1, first_name: 'a\nb' })?.firstName === 'a b');
+
+// rememberUser: only on a subscribed chat, idempotent, updates on change
+const us = emptyState();
+check('rememberUser is a no-op for an unknown chat', rememberUser(us, 1, { id: 1, username: 'a' }) === false && us.chats['1'] === undefined);
+addChat(us, 1);
+check('rememberUser records identity on a subscribed chat', rememberUser(us, 1, { id: 1, username: 'a', first_name: 'A' }) === true && us.chats['1'].user?.username === 'a');
+check('rememberUser is idempotent on unchanged identity', rememberUser(us, 1, { id: 1, username: 'a', first_name: 'A' }) === false);
+check('rememberUser updates on a changed username', rememberUser(us, 1, { id: 1, username: 'a2', first_name: 'A' }) === true && us.chats['1'].user?.username === 'a2');
+check('rememberUser updates on a changed name only', rememberUser(us, 1, { id: 1, username: 'a2', first_name: 'Б' }) === true && us.chats['1'].user?.firstName === 'Б');
+const esc = String.fromCharCode(27); // ESC (0x1b) — C0 control, must be stripped
+check("parseUser strips ANSI/C0 escapes from the name", parseUser({ id: 1, first_name: `a${esc}[31mX` })?.firstName === "a [31mX");
+
+// migration: identity round-trips; a chat without user loads fine
+const uFile = join(dir, 'identity.json');
+await saveState(uFile, { offset: 0, chats: {
+  '1': { sentDay: null, cursor: 2, practice: [], user: { id: 1, username: 'zed', firstName: 'Зед' }, session: null },
+  '2': { sentDay: null, cursor: 0, practice: [], session: null },
+} });
+const uBack = await loadState(uFile);
+check('round-trip keeps user identity', uBack.chats['1'].user?.id === 1 && uBack.chats['1'].user?.username === 'zed' && uBack.chats['1'].user?.firstName === 'Зед', uBack.chats['1'].user);
+check('a chat without user loads with user absent', uBack.chats['2'].user === undefined && uBack.chats['2'].cursor === 0);
 
 await rm(dir, { recursive: true, force: true });
 done('BOT OK');

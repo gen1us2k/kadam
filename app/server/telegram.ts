@@ -7,12 +7,20 @@ import type { BotCommand } from './commands.ts';
 
 const API = 'https://api.telegram.org';
 
+/** Отправитель обновления (from). Только поля, которые мы храним; остальное игнорируем. */
+export interface TelegramFrom {
+  id: number;
+  username?: string;
+  first_name?: string;
+}
+
 export interface TelegramUpdate {
   update_id: number;
-  message?: { chat: { id: number }; text?: string };
+  message?: { chat: { id: number }; text?: string; from?: TelegramFrom };
   callback_query?: {
     id: string;
     data?: string;
+    from?: TelegramFrom;
     message?: { chat: { id: number }; message_id: number };
   };
 }
