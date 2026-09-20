@@ -7,7 +7,7 @@
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { buildLesson, loadDeck } from './daily-task.ts';
-import { buildExercises, buildPracticeExercises } from './exercise.ts';
+import { buildExercises, buildGrammarExercises, buildPracticeExercises, grammarTrack, GRAMMAR_TRACKS } from './exercise.ts';
 import {
   addChat, chatsDue, isSendTime, loadState, removeChat, saveState, type Session,
 } from './bot-state.ts';
@@ -72,11 +72,13 @@ const GREETING =
   'Салам! Раз в сутки я буду присылать урок по кыргызскому: собрать предложение, ' +
   'разобрать суффиксы и вспомнить слова. Отвечать — кнопками. Хочешь быстрее — /next ' +
   '(или кнопка «Дальше ▶»). Тренировка ошибок и добавленных слов — /practice. ' +
-  'Повторить текущий урок — /task, отписаться — /stop.';
+  'Грамматика по темам — /grammar. Повторить текущий урок — /task, отписаться — /stop.';
 
 /** Идентичность сессии-тренировки: константа далеко выше любого номера урока, поэтому устаревший
  *  тап урока (маленький n) никогда не совпадёт с живой тренировкой по guard tap.n. */
 const PRACTICE_N = 1_000_000_000;
+/** Идентичность сессии-грамматики: свой сентинел, отличный от PRACTICE_N и любого номера урока. */
+const GRAMMAR_N = 2_000_000_000;
 
 /**
  * Упражнения урока N. Кэш по номеру урока (bounded): разные чаты — на разных уроках, поэтому кэш
@@ -123,9 +125,12 @@ async function deliverLesson(chatId: number, n: number): Promise<Exclude<SendOut
 
 /** Упражнения текущей сессии по её режиму: урок — из номера, тренировка — из замороженного снимка. */
 function sessionExercises(session: Session): ReturnType<typeof buildExercises> {
-  return session.mode === 'practice'
-    ? buildPracticeExercises(deck, session.cards ?? [], session.seed ?? 0)
-    : lessonExercises(session.n);
+  if (session.mode === 'practice') return buildPracticeExercises(deck, session.cards ?? [], session.seed ?? 0);
+  if (session.mode === 'grammar') {
+    const track = grammarTrack(session.track ?? -1);
+    return track ? buildGrammarExercises(track.tasks, session.seed ?? 0) : [];
+  }
+  return lessonExercises(session.n);
 }
 
 /**
@@ -174,6 +179,41 @@ async function handleAdd(chatId: number, callbackId: string, n: number, i: numbe
   await answerCallback(token, callbackId, before === chat.practice.length ? 'Уже в тренировке' : 'Добавил в тренировку ➕');
 }
 
+/** Меню /grammar: по кнопке на каждый трек (callback gram:<idx>). Чистое — легко проверить. */
+function grammarMenu(): { text: string; keyboard: { text: string; callback_data: string }[][] } {
+  return {
+    text: '📚 Грамматика — выбери программу:',
+    keyboard: GRAMMAR_TRACKS.map((t, idx) => [{ text: t.title, callback_data: `gram:${idx}` }]),
+  };
+}
+
+/**
+ * Старт грамматического трека idx: дрилл-сессия только этой темы. Снимок {track, seed} заморожен на
+ * сессии (пересбор детерминирован и переживает рестарт); сид варьируется при КАЖДОМ старте, чтобы
+ * «🔁 Ещё» давал другой набор. n = GRAMMAR_N (идентичность). Курс/sentDay/набор НЕ трогаем.
+ */
+async function startGrammar(chatId: number, idx: number): Promise<void> {
+  const chat = state.chats[String(chatId)];
+  const track = grammarTrack(idx);
+  if (!chat || !track) { await sendMessage(token, chatId, 'Нет такой программы. Открой список — /grammar.'); return; }
+  // Свежий сид на каждый старт (в т.ч. «Ещё») ради разнообразия; замораживается на сессии ниже,
+  // поэтому пересбор на нажатиях и после рестарта стабилен. Date.now() — рантайм bot.ts (не тест).
+  const seed = (Date.now() ^ ((idx + 1) * 2654435761)) >>> 0;
+  const exercises = buildGrammarExercises(track.tasks, seed);
+  if (exercises.length === 0) { await sendMessage(token, chatId, 'В этой программе пока нет упражнений.'); return; }
+  const fresh: Session = { n: GRAMMAR_N, mode: 'grammar', track: idx, seed, i: 0, missed: [], msgId: 0, picked: [] };
+  const view = render(fresh, exercises);
+  const outcome = await sendMessage(token, chatId, view.text, view.keyboard);
+  if (outcome.kind === 'ok') { fresh.msgId = outcome.messageId; chat.session = fresh; await saveState(STATE_FILE, state); }
+  console.log(`[bot] /grammar ${chatId} -> track ${idx} (${track.title})`);
+}
+
+/** «Выбор трека» с меню/итога. Отвечаем ровно один раз, затем стартуем трек. */
+async function handleGrammar(chatId: number, callbackId: string, idx: number): Promise<void> {
+  await answerCallback(token, callbackId, grammarTrack(idx) ? '📚' : STALE);
+  await startGrammar(chatId, idx);
+}
+
 /**
  * Нажатие на кнопку. `answerCallbackQuery` вызывается РОВНО ОДИН РАЗ на каждом пути, включая
  * отказы: Telegram принимает только первый ответ на `callback_query_id`, а без ответа вовсе
@@ -190,9 +230,9 @@ async function handleTap(
   const session = chat?.session;
   // Нажатие по прежнему экрану отсекается здесь по msgId: продвижение заменяет chat.session новым
   // сообщением, поэтому старое перестаёт быть живым. Номер урока в тапе — второй рубеж в applyTap.
-  if (!session || !tap || tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || !isLiveTap(session, messageId)) {
-    // next/add/practice сюда не доходят (маршрутизируются до handleTap); проверка защитная и
-    // заодно сужает тип tap до ходов внутри сессии (answer/word/reset) для строк ниже.
+  if (!session || !tap || tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || tap.op === 'grammar' || !isLiveTap(session, messageId)) {
+    // next/add/practice/grammar сюда не доходят (маршрутизируются до handleTap); проверка защитная
+    // и заодно сужает тип tap до ходов внутри сессии (answer/word/reset) для строк ниже.
     await answerCallback(token, callbackId, STALE);
     return;
   }
@@ -277,6 +317,11 @@ async function handleCommand(chatId: number, text: string): Promise<void> {
     console.log(`[bot] /next ${chatId} -> lesson ${chat.cursor}`);
   } else if (cmd === '/practice') {
     await startPractice(chatId);
+  } else if (cmd === '/grammar') {
+    if (!state.chats[String(chatId)]) { await sendMessage(token, chatId, 'Сначала подпишитесь — /start.'); return; }
+    const menu = grammarMenu();
+    await sendMessage(token, chatId, menu.text, menu.keyboard);
+    console.log(`[bot] /grammar ${chatId} (menu)`);
   }
   // Anything else is ignored on purpose: the bot never echoes user input.
 }
@@ -389,6 +434,7 @@ while (!stopping) {
         if (tap?.op === 'next') await handleNext(cb.message.chat.id, cb.id, tap.n);
         else if (tap?.op === 'add') await handleAdd(cb.message.chat.id, cb.id, tap.n, tap.i);
         else if (tap?.op === 'practice') { await answerCallback(token, cb.id, '🎯'); await startPractice(cb.message.chat.id); }
+        else if (tap?.op === 'grammar') await handleGrammar(cb.message.chat.id, cb.id, tap.n);
         else await handleTap(cb.message.chat.id, cb.id, cb.message.message_id, cb.data);
       }
       // Нажатие без data наши кнопки прислать не могут, но обещание «ровно один ответ на каждом

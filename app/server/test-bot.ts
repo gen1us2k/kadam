@@ -15,7 +15,10 @@ import {
 import {
   advanceTarget, advancedToday, commitCursor, commitDelivery, lessonSession, shouldAdvanceFromButton,
 } from './progression.ts';
-import { buildExercises, buildPracticeExercises, checkAssembled, type AssembleExercise, type ChoiceExercise } from './exercise.ts';
+import {
+  buildExercises, buildGrammarExercises, buildPracticeExercises, checkAssembled, grammarTrack,
+  GRAMMAR_TRACKS, type AssembleExercise, type ChoiceExercise,
+} from './exercise.ts';
 import { addToPractice, graduatePractice, practiceSeed, selectPractice, wordCardId, PRACTICE_CAP } from './practice.ts';
 import { applyTap, isFinished, isLiveTap, parseTap, render, STALE, summary } from './session.ts';
 import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
@@ -609,6 +612,44 @@ const pView = render(practiceSess, pex);
 const newData = ['add:1000000000:15', 'practice', ...pView.keyboard.flat().map((b) => b.callback_data)];
 check('new callback_data is under 64 bytes', newData.every((d) => Buffer.byteLength(d) < 64), Math.max(0, ...newData.map((d) => Buffer.byteLength(d))));
 check('practice summary offers a 🎯 Ещё button', summary(practiceSess, pex.length).keyboard[0][0].callback_data === 'practice');
+
+// --- grammar tracks (Stage 2) ---
+check('GRAMMAR_TRACKS is non-empty', GRAMMAR_TRACKS.length >= 1, GRAMMAR_TRACKS.length);
+// Дрейф-страж: если task-метку переименуют в morphology.ts, трек перестанет давать дриллы.
+check('every grammar track yields drills', GRAMMAR_TRACKS.every((t) => buildDrills(8, 1, t.tasks).length > 0), GRAMMAR_TRACKS.map((t) => buildDrills(8, 1, t.tasks).length));
+check('grammarTrack returns a track for a valid index', grammarTrack(0)?.title === GRAMMAR_TRACKS[0].title);
+check('grammarTrack rejects out-of-range and non-integer', grammarTrack(-1) === null && grammarTrack(999) === null && grammarTrack(1.5) === null);
+const gex = buildGrammarExercises(GRAMMAR_TRACKS[1].tasks, 4242); // Падежи
+check('grammar exercises are drills, capped and non-empty', gex.length > 0 && gex.length <= 8 && gex.every((e) => e.kind === 'drill'), gex.length);
+check('grammar exercise has a non-empty answer', gex.every((e) => e.answer.length > 0));
+check('buildGrammarExercises is deterministic', JSON.stringify(buildGrammarExercises(GRAMMAR_TRACKS[1].tasks, 7)) === JSON.stringify(buildGrammarExercises(GRAMMAR_TRACKS[1].tasks, 7)));
+check('different tracks give different drills', buildGrammarExercises(GRAMMAR_TRACKS[0].tasks, 9)[0].prompt !== buildGrammarExercises(GRAMMAR_TRACKS[2].tasks, 9)[0].prompt);
+const gramTap = parseTap('gram:2');
+check('parseTap gram carries the track index', gramTap?.op === 'grammar' && gramTap.n === 2, gramTap);
+check('parseTap gram without index rejected', parseTap('gram:') === null);
+
+// grammar session identity (GRAMMAR_N=2e9) — взаимно неактуальна с уроком и тренировкой.
+const gramSess: Session = { n: 2_000_000_000, mode: 'grammar', track: 1, seed: 4242, i: 0, missed: [], msgId: 8, picked: [] };
+check('a lesson tap on a grammar session is refused', applyTap({ ...gramSess }, gex, { op: 'answer', n: 4, i: 0, arg: 0 }).toast === STALE);
+check('a practice-identity tap on a grammar session is refused', applyTap({ ...gramSess }, gex, { op: 'answer', n: 1_000_000_000, i: 0, arg: 0 }).toast === STALE);
+const gAns = gex[0] as ChoiceExercise;
+check('the grammar answer is actually among the options', gAns.options.includes(gAns.answer), gAns.options);
+const gAdv: Session = { ...gramSess, missed: [] };
+const gAdvView = applyTap(gAdv, gex, { op: 'answer', n: 2_000_000_000, i: 0, arg: gAns.options.indexOf(gAns.answer) });
+check('a correct grammar answer advances and is scored correct', gAdvView.view !== null && gAdv.i === 1 && gAdv.missed.length === 0, gAdv);
+// заголовок и кнопка «🔁 Ещё»
+const gSummary = summary(gramSess, gex.length);
+check('grammar summary offers one Ещё button', gSummary.keyboard.length === 1 && gSummary.keyboard[0][0].callback_data === 'gram:1', gSummary.keyboard);
+check('grammar header shows the track title', render(gramSess, gex).text.includes(GRAMMAR_TRACKS[1].title), render(gramSess, gex).text.slice(0, 40));
+check('grammar callback_data under 64 bytes', ['gram:2', ...GRAMMAR_TRACKS.map((_, k) => `gram:${k}`)].every((d) => Buffer.byteLength(d) < 64));
+
+// migration: grammar session round-trips; unknown mode → lesson.
+const gFile = join(dir, 'grammar.json');
+await saveState(gFile, { offset: 0, chats: { '3': { sentDay: null, cursor: 0, practice: [], session: gramSess } } });
+const gBack = await loadState(gFile);
+check('round-trip keeps a grammar session', gBack.chats['3'].session?.mode === 'grammar' && gBack.chats['3'].session?.track === 1 && gBack.chats['3'].session?.seed === 4242, gBack.chats['3'].session);
+await writeFile(gFile, JSON.stringify({ offset: 0, chats: { '4': { sentDay: null, cursor: 0, practice: [], session: { n: 5, mode: 'bogus', i: 0, missed: [], msgId: 1, picked: [] } } } }), 'utf8');
+check('unknown session mode migrates to lesson', (await loadState(gFile)).chats['4'].session?.mode === 'lesson');
 
 await rm(dir, { recursive: true, force: true });
 done('BOT OK');

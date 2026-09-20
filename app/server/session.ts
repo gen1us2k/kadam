@@ -1,7 +1,7 @@
 // Машина сессии: что показать на текущем шаге и что делать с нажатием. Чистая — ни сети, ни
 // диска, поэтому порядок шагов, подсчёт и обработка устаревших нажатий проверяются тестом.
 
-import { checkAssembled, type Exercise } from './exercise.ts';
+import { checkAssembled, grammarTrack, type Exercise } from './exercise.ts';
 import type { Session } from './bot-state.ts';
 import { escapeHtml, type Keyboard } from './telegram.ts';
 
@@ -12,7 +12,8 @@ export type Tap =
   | { op: 'reset'; n: number; i: number }
   | { op: 'next'; n: number }
   | { op: 'add'; n: number; i: number }   // «➕ в тренировку» — обрабатывается в bot.ts
-  | { op: 'practice' };                    // «🎯 Тренировка» / старт тренировки — в bot.ts
+  | { op: 'practice' }                     // «🎯 Тренировка» / старт тренировки — в bot.ts
+  | { op: 'grammar'; n: number };          // старт грамматического трека (n = индекс трека) — в bot.ts
 
 /**
  * Разбор callback_data. Значение приходит от клиента, а не от нас, поэтому ничему в нём верить
@@ -26,6 +27,7 @@ export function parseTap(data: string): Tap | null {
   const digits = /^\d+$/;
   if (!digits.test(rawN ?? '')) return null;
   const n = Number(rawN);
+  if (op === 'gram') return { op: 'grammar', n }; // n здесь — индекс трека
   if (op === 'next') return { op: 'next', n };
   if (!digits.test(rawI ?? '')) return null;
   const i = Number(rawI);
@@ -58,7 +60,10 @@ function rows<T>(items: T[], width: number): T[][] {
 
 /** Заголовок с прогрессом плюс необязательная строка отклика на прошлый ответ. */
 /** Заголовок по режиму: урок несёт номер, тренировка — своё имя. */
-const title = (s: Session): string => (s.mode === 'practice' ? '🎯 <b>Тренировка</b>' : `🇰🇬 <b>Урок ${s.n + 1}</b>`);
+const title = (s: Session): string =>
+  s.mode === 'practice' ? '🎯 <b>Тренировка</b>'
+  : s.mode === 'grammar' ? `📚 <b>${escapeHtml(grammarTrack(s.track ?? -1)?.title ?? 'Грамматика')}</b>`
+  : `🇰🇬 <b>Урок ${s.n + 1}</b>`;
 
 function header(session: Session, total: number, feedback?: string): string {
   const progress = `${title(session)} · ${session.i + 1}/${total}`;
@@ -111,6 +116,12 @@ export function summary(session: Session, total: number, feedback?: string): Vie
   if (session.missed.length > 0) {
     lines.push('', 'Не получилось:', ...session.missed.map((m) => `• ${escapeHtml(m)}`));
   }
+  if (session.mode === 'grammar') {
+    lines.push('', 'Ещё раз — кнопкой ниже или /grammar.');
+    // `?? -1` — тот же сентинел отсутствующего трека, что и в title(): битая сессия даёт inert-кнопку
+    // (gram:-1 не парсится), а не молча перезапускает трек 0. На практике startGrammar всегда ставит track.
+    return { text: lines.join('\n'), keyboard: [[{ text: '🔁 Ещё', callback_data: encode('gram', session.track ?? -1) }]] };
+  }
   if (session.mode === 'practice') {
     lines.push('', 'Верные ушли из набора, ошибки остались. Ещё раз — /practice.');
     return { text: lines.join('\n'), keyboard: [[{ text: '🎯 Ещё', callback_data: encode('practice') }]] };
@@ -160,7 +171,7 @@ export const STALE = 'Это уже неактуально — откройте 
 export function applyTap(session: Session, exercises: Exercise[], tap: Tap): TapResult {
   // next/add/practice — не ходы внутри сессии; их маршрутизирует bot.ts до applyTap. Защитно гасим
   // и заодно сужаем тип tap до answer/word/reset (у которых есть n/i) для строк ниже.
-  if (tap.op === 'next' || tap.op === 'add' || tap.op === 'practice') return { view: null, toast: STALE };
+  if (tap.op === 'next' || tap.op === 'add' || tap.op === 'practice' || tap.op === 'grammar') return { view: null, toast: STALE };
   const ex = exercises[session.i];
   // `!ex` покрывает и доигранную сессию: за последним упражнением элемента нет.
   if (tap.n !== session.n || tap.i !== session.i || !ex) return { view: null, toast: STALE };

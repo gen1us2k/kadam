@@ -16,12 +16,14 @@ export interface Session {
    * (деплой, меняющий anki/*.csv, сдвинет слова под живым курсором — принятый риск).
    */
   n: number;
-  /** Режим: обычный урок или персональная тренировка. Старые сессии мигрируют в 'lesson'. */
-  mode: 'lesson' | 'practice';
+  /** Режим: урок, персональная тренировка или грамматический трек. Старые сессии → 'lesson'. */
+  mode: 'lesson' | 'practice' | 'grammar';
   /** Тренировка: замороженный снимок cardId, по которому сессия пересобирает упражнения. */
   cards?: string[];
-  /** Тренировка: сид порядка вариантов (из practiceSeed). */
+  /** Тренировка + грамматика: сид порядка вариантов (practiceSeed / сид трека). */
   seed?: number;
+  /** Грамматика: индекс трека в GRAMMAR_TRACKS (заголовок + кнопка «🔁 Ещё»). */
+  track?: number;
   /** Номер текущего упражнения; он же — число уже отвеченных. */
   i: number;
   /**
@@ -72,12 +74,13 @@ function chatFrom(raw: unknown): ChatState {
     s && Number.isFinite(s.n) && Number.isFinite(s.i)
       ? {
           n: num(s.n),
-          // Старые сессии без mode — это урок (тренировки до этого релиза не было).
-          mode: s.mode === 'practice' ? 'practice' : 'lesson',
+          // Старые сессии без mode — это урок; неизвестный режим тоже сводим к уроку.
+          mode: s.mode === 'practice' ? 'practice' : s.mode === 'grammar' ? 'grammar' : 'lesson',
           ...(Array.isArray(s.cards)
             ? { cards: s.cards.filter((c): c is string => typeof c === 'string') }
             : {}),
           ...(Number.isFinite(s.seed) ? { seed: num(s.seed) } : {}),
+          ...(Number.isFinite(s.track) ? { track: num(s.track) } : {}),
           i: num(s.i),
           missed: Array.isArray(s.missed) ? s.missed.filter((m) => typeof m === 'string') : [],
           msgId: num(s.msgId),

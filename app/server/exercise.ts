@@ -2,7 +2,7 @@
 // Модуль чистый — ни сети, ни состояния: порядок вариантов выводится из сида дня, поэтому
 // упражнения пересобираются одинаково при каждом нажатии и переживают рестарт без хранения.
 
-import { drillOptions } from '../src/lib/morphology.ts';
+import { buildDrills, drillOptions } from '../src/lib/morphology.ts';
 import { makeBank, rng, shuffle, type Chip } from '../src/lib/study-utils.ts';
 import { cardId, type VocabRow } from '../src/lib/vocab-parse.ts';
 import type { DailyTask } from './daily-task.ts';
@@ -110,6 +110,33 @@ export function buildPracticeExercises(deck: VocabRow[], cards: string[], seed: 
     });
   }
   return out;
+}
+
+/** Тематические грамматические программы: заголовок + task-метки DRILL_TYPES из morphology.ts.
+ *  Порядок = порядок в меню /grammar; индекс трека хранится в Session.track. */
+export const GRAMMAR_TRACKS: { title: string; tasks: string[] }[] = [
+  { title: 'Множественное число', tasks: ['Множественное число'] },
+  { title: 'Падежи', tasks: ['Где? (жатыш)', 'Куда? (барыш)', 'Откуда? (чыгыш)'] },
+  { title: 'Времена глагола', tasks: ['Настоящее (-ып жатат)', 'Прошедшее (-ды)', 'Будущее (-ат)', 'Отрицание (-байт)'] },
+];
+
+/** Трек по индексу или null (защита от устаревшего/битого индекса). Чистая — тестируется. */
+export function grammarTrack(idx: number): { title: string; tasks: string[] } | null {
+  return Number.isInteger(idx) && idx >= 0 && idx < GRAMMAR_TRACKS.length ? GRAMMAR_TRACKS[idx] : null;
+}
+
+/** Сколько дриллов в одной сессии грамматики (ограничено ещё и числом слов в morphology). */
+const GRAMMAR_SIZE = 8;
+
+/** Упражнения грамматического трека: дриллы только выбранных тем, порядок вариантов из seed. */
+export function buildGrammarExercises(tasks: string[], seed: number, count = GRAMMAR_SIZE): Exercise[] {
+  return buildDrills(count, seed, tasks).map((drill, k) => ({
+    kind: 'drill',
+    prompt: `${drill.word} → ${drill.task}`,
+    options: drillOptions(drill, exerciseSeed(seed, k)),
+    answer: drill.answer,
+    label: `${drill.word} → ${drill.task}`,
+  }));
 }
 
 /** Верна ли сборка предложения. Сравнение по тексту, поэтому повтор слова не даёт ложной ошибки. */
